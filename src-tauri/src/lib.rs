@@ -1,3 +1,4 @@
+pub mod airdata_parser;
 pub mod api;
 pub mod database;
 pub mod dronelogbook_parser;
@@ -11,5 +12,6 @@ pub mod server;
 pub use database::Database;
 pub use models::*;
 pub use parser::LogParser;
+pub use airdata_parser::AirdataParser;
 pub use litchi_parser::LitchiParser;
 pub use dronelogbook_parser::DroneLogbookParser;

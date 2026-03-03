@@ -586,7 +586,7 @@ export function FlightImporter() {
           return;
         }
         
-        // Filter for .txt and .csv files (DJI logs and Litchi exports)
+        // Filter for .txt and .csv files (DJI logs, Litchi, and Airdata exports)
         const logFiles = entries
           .filter((entry) => {
             if (!entry.isFile || !entry.name) return false;
@@ -781,7 +781,7 @@ export function FlightImporter() {
       const { readDir } = await import('@tauri-apps/plugin-fs');
       const entries = await readDir(folderPath);
       
-      // Filter for .txt and .csv files (DJI logs and Litchi exports)
+      // Filter for .txt and .csv files (DJI logs, Litchi, and Airdata exports)
       const logFiles = entries
         .filter((entry) => {
           if (!entry.isFile || !entry.name) return false;

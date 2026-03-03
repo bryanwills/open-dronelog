@@ -12,6 +12,7 @@
     windows_subsystem = "windows"
 )]
 
+mod airdata_parser;
 mod api;
 mod database;
 mod dronelogbook_parser;

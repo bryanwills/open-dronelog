@@ -26,6 +26,7 @@ use dji_log_parser::DJILog;
 
 use crate::api::DjiApi;
 use crate::database::Database;
+use crate::airdata_parser::AirdataParser;
 use crate::dronelogbook_parser::DroneLogbookParser;
 use crate::litchi_parser::LitchiParser;
 use crate::models::{FlightMessage, FlightMetadata, FlightStats, TelemetryPoint};
@@ -94,7 +95,7 @@ pub enum ParserError {
     #[error("Parsing timed out after {0} seconds — file may be corrupt or unsupported")]
     Timeout(u64),
 
-    #[error("Incompatible file format — only DJI flight logs (.txt), Litchi CSV exports, and Open DroneLog CSV exports are supported")]
+    #[error("Incompatible file format — only DJI flight logs (.txt), Litchi CSV exports, Airdata CSV exports, and Open DroneLog CSV exports are supported")]
     IncompatibleFile,
 }
 
@@ -174,6 +175,13 @@ impl<'a> LogParser<'a> {
             log::info!("Detected Drone Logbook CSV format, using DroneLogbookParser");
             let dronelogbook_parser = DroneLogbookParser::new(self.db);
             return dronelogbook_parser.parse(file_path, &file_hash);
+        }
+
+        // Check for Airdata CSV format
+        if AirdataParser::is_airdata_csv(file_path) {
+            log::info!("Detected Airdata CSV format, using AirdataParser");
+            let airdata_parser = AirdataParser::new(self.db);
+            return airdata_parser.parse(file_path, &file_hash);
         }
 
         // Check for Litchi CSV format
@@ -1015,6 +1023,17 @@ impl<'a> LogParser<'a> {
             100 // default 10Hz assumption
         };
 
+        let mut prev_voltage_warning = 0;
+        let mut prev_compass_error = false;
+        let mut prev_motor_blocked = false;
+        let mut prev_wave_error = false;
+        let mut prev_barometer_dead = false;
+        let mut prev_accel_over = false;
+        let mut prev_not_enough_force = false;
+        let mut prev_out_of_limit = false;
+        let mut prev_flight_action_msg = std::option::Option::<&str>::None;
+        let mut prev_non_gps_cause_msg = std::option::Option::<&str>::None;
+
         for frame in frames {
             let current_timestamp_ms = if frame.osd.fly_time > 0.0 {
                 (frame.osd.fly_time * 1000.0) as i64
@@ -1039,6 +1058,160 @@ impl<'a> LogParser<'a> {
                     message: frame.app.warn.clone(),
                 });
             }
+
+            // OSD state tracking for missing warnings
+            
+            // 1. Voltage Warning (0=Normal, 1=Low, 2=Severe Low, etc.)
+            let current_voltage_warning = frame.osd.voltage_warning;
+            if current_voltage_warning != 0 && current_voltage_warning != prev_voltage_warning {
+                let msg = match current_voltage_warning {
+                    1 => "Low Battery Warning",
+                    2 => "Severe Low Battery Warning",
+                    3 => "Smart Low Battery Warning",
+                    _ => "Battery Voltage Warning",
+                };
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: msg.to_string(),
+                });
+            }
+            prev_voltage_warning = current_voltage_warning;
+
+            // 2. Compass Error
+            let current_compass_error = frame.osd.is_compass_error;
+            if current_compass_error && !prev_compass_error {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Compass Error".to_string(),
+                });
+            }
+            prev_compass_error = current_compass_error;
+
+            // 3. Motor Blocked
+            let current_motor_blocked = frame.osd.is_motor_blocked;
+            if current_motor_blocked && !prev_motor_blocked {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Motor Blocked or Overloaded".to_string(),
+                });
+            }
+            prev_motor_blocked = current_motor_blocked;
+
+            // 4. Wave Error (Vision System Error)
+            let current_wave_error = frame.osd.wave_error;
+            if current_wave_error && !prev_wave_error {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Vision System Error".to_string(),
+                });
+            }
+            prev_wave_error = current_wave_error;
+
+            // 5. Barometer Dead in Air
+            let current_barometer_dead = frame.osd.is_barometer_dead_in_air;
+            if current_barometer_dead && !prev_barometer_dead {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Barometer Error".to_string(),
+                });
+            }
+            prev_barometer_dead = current_barometer_dead;
+
+            // 6. Accelerometer Over Range
+            let current_accel_over = frame.osd.is_acceletor_over_range;
+            if current_accel_over && !prev_accel_over {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Accelerometer Over Range".to_string(),
+                });
+            }
+            prev_accel_over = current_accel_over;
+
+            // 7. Not Enough Force (e.g. low battery / payload too heavy)
+            let current_not_enough_force = frame.osd.is_not_enough_force;
+            if current_not_enough_force && !prev_not_enough_force {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Not Enough Force (Propulsion/Power Issue)".to_string(),
+                });
+            }
+            prev_not_enough_force = current_not_enough_force;
+
+            // 8. Flight Limit Reached
+            let current_out_of_limit = frame.osd.is_out_of_limit;
+            if current_out_of_limit && !prev_out_of_limit {
+                messages.push(FlightMessage {
+                    timestamp_ms: current_timestamp_ms,
+                    message_type: "warn".to_string(),
+                    message: "Flight Limit Reached".to_string(),
+                });
+            }
+            prev_out_of_limit = current_out_of_limit;
+
+            // 9. Flight Action transitions (critical ones)
+            // e.g., AutoLanding due to battery, WarningPowerGoHome, MotorblockLanding, etc.
+            let current_flight_action_msg = frame.osd.flight_action.and_then(|action| {
+                use dji_log_parser::record::osd::FlightAction;
+                match action {
+                    FlightAction::WarningPowerGoHome => Some("Low Battery RTH Triggered"),
+                    FlightAction::WarningPowerLanding => Some("Low Battery Auto Landing"),
+                    FlightAction::SmartPowerGoHome => Some("Smart RTH Triggered"),
+                    FlightAction::SmartPowerLanding => Some("Smart Auto Landing"),
+                    FlightAction::LowVoltageLanding => Some("Critical Low Voltage Landing"),
+                    FlightAction::LowVoltageGoHome => Some("Low Voltage RTH"),
+                    FlightAction::SeriousLowVoltageLanding => Some("Severe Low Voltage Landing"),
+                    FlightAction::BatteryForceLanding => Some("Battery Forced Landing"),
+                    FlightAction::MotorblockLanding => Some("Motor Blocked Forced Landing"),
+                    FlightAction::AppRequestForceLanding => Some("App Requested Forced Landing"),
+                    FlightAction::FakeBatteryLanding => Some("Non-intelligent Battery Landing"),
+                    FlightAction::GoHomeAvoid => Some("Obstacle Avoidance during RTH"),
+                    _ => std::option::Option::None,
+                }
+            });
+            
+            if current_flight_action_msg != prev_flight_action_msg {
+                if let Some(msg) = current_flight_action_msg {
+                    messages.push(FlightMessage {
+                        timestamp_ms: current_timestamp_ms,
+                        message_type: "warn".to_string(),
+                        message: msg.to_string(),
+                    });
+                }
+            }
+            prev_flight_action_msg = current_flight_action_msg;
+
+            // 10. Non GPS Cause (if GPS is lost, tell the user why)
+            let current_non_gps_cause_msg = frame.osd.non_gps_cause.and_then(|cause| {
+                use dji_log_parser::record::osd::NonGPSCause;
+                match cause {
+                    NonGPSCause::Forbid => Some("GPS Forbidden"),
+                    NonGPSCause::GpsNumNonEnough => Some("Weak GPS Signal"),
+                    NonGPSCause::GpsHdopLarge => Some("GPS Accuracy Low"),
+                    NonGPSCause::GpsPositionNonMatch => Some("GPS Position Mismatch"),
+                    NonGPSCause::SpeedErrorLarge => Some("Speed Error Large (GPS lost)"),
+                    NonGPSCause::YawErrorLarge => Some("Yaw Error Large (GPS lost)"),
+                    NonGPSCause::CompassErrorLarge => Some("Compass Error Large (GPS lost)"),
+                    _ => std::option::Option::None,
+                }
+            });
+            
+            if current_non_gps_cause_msg != prev_non_gps_cause_msg {
+                if let Some(msg) = current_non_gps_cause_msg {
+                    messages.push(FlightMessage {
+                        timestamp_ms: current_timestamp_ms,
+                        message_type: "warn".to_string(),
+                        message: msg.to_string(),
+                    });
+                }
+            }
+            prev_non_gps_cause_msg = current_non_gps_cause_msg;
 
             timestamp_ms = current_timestamp_ms + fallback_interval_ms;
         }

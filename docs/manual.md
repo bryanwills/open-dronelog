@@ -30,7 +30,7 @@
 
 ## Overview
 
-Drone Logbook is a high-performance application for analyzing drone flight logs. It supports DJI flight logs (`.txt` format) and Litchi CSV exports. All your data is stored locally in a DuckDB database with no cloud uploads, no subscriptions, and complete privacy.
+Drone Logbook is a high-performance application for analyzing drone flight logs. It supports DJI flight logs (`.txt` format), Litchi CSV exports, and Airdata CSV exports. All your data is stored locally in a DuckDB database with no cloud uploads, no subscriptions, and complete privacy.
 
 ### Key Capabilities
 
@@ -59,7 +59,7 @@ When you first open Drone Logbook, you will see an empty dashboard with the impo
 ### Importing Your First Flight
 
 1. Click **Browse Files** or drag-and-drop flight log files onto the import area
-2. Select your DJI `.txt` files or Litchi `.csv` files
+2. Select your DJI `.txt` files, Litchi `.csv` files, or Airdata `.csv` files
 3. Wait for processing (the app will decrypt DJI logs, which requires internet on first import)
 4. Your flights appear in the sidebar list
 
@@ -116,6 +116,7 @@ The application is divided into three main areas:
 |--------|----------------|--------|
 | DJI Flight Logs | `.txt` | Modern DJI format from DJI Fly app |
 | Litchi CSV | `.csv` | Exported from Litchi app |
+| Airdata CSV | `.csv` | Exported from airdata.com (all unit settings supported) |
 
 ### Import Methods
 
@@ -339,6 +340,7 @@ When enabled, the app automatically generates descriptive tags during import:
 | **Country** | Reverse geocoded from takeoff coordinates |
 | **Continent** | Reverse geocoded from takeoff coordinates |
 | **Litchi** | Flight was imported from Litchi CSV |
+| **Airdata** | Flight was imported from Airdata CSV |
 | **Manual Entry** | Flight was created via manual entry (no log file) |
 
 ### Manual Tags
