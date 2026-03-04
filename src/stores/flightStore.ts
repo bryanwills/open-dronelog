@@ -5,9 +5,57 @@
 
 import { create } from 'zustand';
 import * as api from '@/lib/api';
-import type { Flight, FlightDataResponse, ImportResult, OverviewStats } from '@/types';
+import type { Flight, FlightDataResponse, FlightMessage, ImportResult, OverviewStats } from '@/types';
 import { normalizeSerial } from '@/lib/utils';
 import i18n from '@/i18n';
+
+/**
+ * Scan battery telemetry and generate warning/caution messages
+ * when battery level first crosses 20% and 10% thresholds.
+ */
+function generateBatteryMessages(flightData: FlightDataResponse): FlightMessage[] {
+  const { telemetry } = flightData;
+  if (!telemetry?.battery || !telemetry?.time || telemetry.battery.length === 0) return [];
+
+  const msgs: FlightMessage[] = [];
+  let warned20 = false;
+  let warned10 = false;
+
+  for (let i = 0; i < telemetry.battery.length; i++) {
+    const batt = telemetry.battery[i];
+    if (batt == null) continue;
+
+    if (!warned20 && batt <= 20 && batt > 10) {
+      warned20 = true;
+      msgs.push({
+        timestampMs: Math.round(telemetry.time[i] * 1000),
+        messageType: 'warn',
+        message: `Battery low: ${batt}%`,
+      });
+    }
+    if (!warned10 && batt <= 10) {
+      warned20 = true; // skip 20% if we hit 10% first
+      warned10 = true;
+      msgs.push({
+        timestampMs: Math.round(telemetry.time[i] * 1000),
+        messageType: 'caution',
+        message: `Battery critical: ${batt}%`,
+      });
+    }
+    if (warned20 && warned10) break;
+  }
+  return msgs;
+}
+
+/** Append battery warnings into flight data messages (sorted by timestamp). */
+function injectBatteryMessages(flightData: FlightDataResponse): FlightDataResponse {
+  const battMsgs = generateBatteryMessages(flightData);
+  if (battMsgs.length === 0) return flightData;
+
+  const existing = flightData.messages ?? [];
+  const merged = [...existing, ...battMsgs].sort((a, b) => a.timestampMs - b.timestampMs);
+  return { ...flightData, messages: merged };
+}
 
 interface FlightState {
   // State
@@ -358,7 +406,8 @@ export const useFlightStore = create<FlightState>((set, get) => ({
       return;
     }
     try {
-      const flightData = await api.getFlightData(flightId, 5000);
+      const rawFlightData = await api.getFlightData(flightId, 5000);
+      const flightData = injectBatteryMessages(rawFlightData);
 
       // Store in cache (limit cache size to 10 entries)
       const cache = new Map(get()._flightDataCache);
