@@ -61,6 +61,7 @@ export function Overview({ stats, flights, unitSystem, onSelectFlight }: Overvie
   const maintenanceLastReset = useFlightStore((state) => state.maintenanceLastReset);
   const setMaintenanceThreshold = useFlightStore((state) => state.setMaintenanceThreshold);
   const performMaintenance = useFlightStore((state) => state.performMaintenance);
+  const donationAcknowledged = useFlightStore((state) => state.donationAcknowledged);
   const resolvedTheme = useMemo(() => resolveThemeMode(themeMode), [themeMode]);
 
   // Use sidebar-filtered flights (fall back to all flights if no filter set yet)
@@ -446,6 +447,24 @@ export function Overview({ stats, flights, unitSystem, onSelectFlight }: Overvie
         setMaintenanceThreshold={setMaintenanceThreshold}
         performMaintenance={performMaintenance}
       />
+
+      {/* Donation Note */}
+      {!donationAcknowledged && (
+      <div className="mt-6 mb-2 mx-auto max-w-4xl rounded-lg border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-white/[0.03] px-5 py-4 sm:px-8">
+        <p className="text-center text-xs leading-relaxed text-gray-500 dark:text-gray-500 sm:text-sm">
+          {t('overview.donationNote')}{' '}
+          <a
+            href="https://ko-fi.com/arpandesign"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-amber-500 hover:text-amber-400 underline underline-offset-2"
+          >
+            Ko-fi
+          </a>
+          {' '}{t('overview.donationNoteSuffix')}
+        </p>
+      </div>
+      )}
     </div>
   );
 }

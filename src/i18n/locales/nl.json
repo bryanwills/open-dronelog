@@ -273,6 +273,8 @@
     "lastMaintenance": "Laatste onderhoud: {{date}}",
     "never": "Nooit",
     "maintenanceDone": "✓ Onderhoud Uitgevoerd",
+    "donationNote": "Privacy mag geen prijskaartje hebben. Ik heb deze open-source tool gebouwd om je abonnementskosten te besparen en je data privé te houden. Als Open DroneLog je tijd of kopzorgen heeft bespaard, overweeg dan een kleine donatie via",
+    "donationNoteSuffix": "— het is gebouwd tijdens late avonden met veel koffie, en een kleine fooi helpt enorm.",
     "save": "Opslaan",
     "cancel": "Annuleren"
   },

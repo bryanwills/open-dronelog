@@ -274,7 +274,9 @@
     "clearSelection": "Clear selection",
     "lastMaintenance": "Last maintenance: {{date}}",
     "never": "Never",
-    "maintenanceDone": "✓ Maintenance Done"
+    "maintenanceDone": "✓ Maintenance Done",
+    "donationNote": "Privacy shouldn't have a price tag. I built this open-source tool to save you subscription costs and keep your data private. If Open DroneLog has saved you time or headaches, consider a small donation via",
+    "donationNoteSuffix": "- it's built on late nights and a lot of coffee, and a small tip goes a long way."
   },
   "importer": {
     "importFlightLog": "Import a drone flight log",

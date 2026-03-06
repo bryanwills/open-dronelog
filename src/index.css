@@ -58,6 +58,39 @@ body.theme-light .border-gray-700 {
   border-color: #e2e8f0 !important;
 }
 
+/* Light mode: form inputs with dark hardcoded classes */
+body.theme-light .bg-gray-900 {
+  background-color: #ffffff !important;
+}
+
+body.theme-light .bg-gray-800 {
+  background-color: #f8fafc !important;
+}
+
+body.theme-light .border-gray-600 {
+  border-color: #cbd5e1 !important;
+}
+
+body.theme-light .text-gray-200 {
+  color: #1e293b !important;
+}
+
+body.theme-light .placeholder-gray-500::placeholder {
+  color: #94a3b8 !important;
+}
+
+body.theme-light .hover\:text-gray-300:hover {
+  color: #334155 !important;
+}
+
+body.theme-light .hover\:bg-gray-700\/50:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+body.theme-light .bg-gray-700 {
+  background-color: #e2e8f0 !important;
+}
+
 /* Light mode: toggle switch off state - darker gray background */
 body.theme-light .toggle-track-off {
   background-color: rgb(203, 213, 225) !important;

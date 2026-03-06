@@ -273,6 +273,8 @@
     "lastMaintenance": "上次维护：{{date}}",
     "never": "从未",
     "maintenanceDone": "✓ 维护已完成",
+    "donationNote": "隐私不应该有价格标签。我开发了这个开源工具，帮助你节省订阅费用并保护你的数据隐私。如果 Open DroneLog 为你节省了时间或减少了麻烦，请考虑通过",
+    "donationNoteSuffix": "进行小额捐赠——这个项目诞生于无数个深夜和大量咖啡，一点小费就能带来很大的帮助。",
     "save": "保存",
     "cancel": "取消"
   },

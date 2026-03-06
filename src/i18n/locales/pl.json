@@ -273,6 +273,8 @@
     "lastMaintenance": "Ostatnia konserwacja: {{date}}",
     "never": "Nigdy",
     "maintenanceDone": "✓ Konserwacja Wykonana",
+    "donationNote": "Prywatność nie powinna mieć ceny. Stworzyłem to narzędzie open-source, aby zaoszczędzić Ci kosztów subskrypcji i chronić Twoje dane. Jeśli Open DroneLog zaoszczędził Ci czasu lub problemów, rozważ niewielką dotację przez",
+    "donationNoteSuffix": "— powstaje podczas późnych nocy i dużej ilości kawy, a mały napiwek naprawdę pomaga.",
     "save": "Zapisz",
     "cancel": "Anuluj"
   },
