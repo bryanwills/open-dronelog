@@ -9,6 +9,7 @@ import * as api from '@/lib/api';
 import { isWebMode, getKeepUploadSettings, setKeepUploadSettings, KeepUploadSettings } from '@/lib/api';
 import { useFlightStore } from '@/stores/flightStore';
 import { Select } from '@/components/ui/Select';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { getBlacklist, clearBlacklist } from './FlightImporter';
 import { SMART_TAG_TYPES, getEnabledSmartTagTypes, setEnabledSmartTagTypes, SmartTagTypeId } from '@/lib/api';
 
@@ -730,12 +731,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   /* Profile has a password — change or remove */
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <input
-                        type="password"
+                      <PasswordInput
+                        wrapperClassName="flex-1 min-w-0"
                         placeholder={t('settings.currentPassword')}
                         value={pwCurrent}
                         onChange={e => setPwCurrent(e.target.value)}
-                        className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                        className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
                       />
                       <button
                         type="button"
@@ -758,20 +759,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       </button>
                     </div>
                     <div className="flex gap-2">
-                      <input
-                        type="password"
+                      <PasswordInput
+                        wrapperClassName="flex-1 min-w-0"
                         placeholder={t('settings.newPasswordOpt')}
                         value={pwNew}
                         onChange={e => setPwNew(e.target.value)}
-                        className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                        className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
                       />
                       {pwNew && (
-                        <input
-                          type="password"
+                        <PasswordInput
+                          wrapperClassName="flex-1 min-w-0"
                           placeholder={t('settings.confirmPassword')}
                           value={pwConfirm}
                           onChange={e => setPwConfirm(e.target.value)}
-                          className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                          className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
                         />
                       )}
                       {pwNew && (
@@ -800,19 +801,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   /* Profile has no password — set one */
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <input
-                        type="password"
+                      <PasswordInput
+                        wrapperClassName="flex-1 min-w-0"
                         placeholder={t('settings.newPasswordLabel')}
                         value={pwNew}
                         onChange={e => setPwNew(e.target.value)}
-                        className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                        className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
                       />
-                      <input
-                        type="password"
+                      <PasswordInput
+                        wrapperClassName="flex-1 min-w-0"
                         placeholder={t('settings.confirmPassword')}
                         value={pwConfirm}
                         onChange={e => setPwConfirm(e.target.value)}
-                        className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                        className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
                       />
                       <button
                         type="button"
@@ -896,12 +897,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
 
                 <div className="flex gap-2">
-                  <input
-                    type="password"
+                  <PasswordInput
+                    wrapperClassName="flex-1 min-w-0"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder={hasKey ? '••••••••••••••••' : 'Enter your DJI API key'}
-                    className="flex-1 min-w-0 px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                    className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
                   />
                   <button
                     onClick={handleSave}

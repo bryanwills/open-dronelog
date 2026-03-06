@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlightStore } from '@/stores/flightStore';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { isWebMode, hasMasterPassword } from '@/lib/api';
 
 export function ProfileSelector() {
@@ -256,9 +257,8 @@ export function ProfileSelector() {
               <p className="text-xs text-gray-300 mb-2">
                 {t('profile.enterPassword', { name: passwordPrompt })}
               </p>
-              <input
+              <PasswordInput
                 ref={passRef}
-                type="password"
                 value={switchPassword}
                 onChange={(e) => { setSwitchPassword(e.target.value); setError(null); }}
                 onKeyDown={(e) => {
@@ -301,21 +301,21 @@ export function ProfileSelector() {
                 </p>
               </div>
               {profilePasswords[confirmingDelete] && (
-                <input
-                  type="password"
+                <PasswordInput
+                  wrapperClassName="mb-1.5"
                   value={deletePassword}
                   onChange={(e) => { setDeletePassword(e.target.value); setError(null); }}
                   placeholder={t('profile.passwordPlaceholder')}
-                  className="w-full text-xs px-2 py-1.5 mb-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
+                  className="w-full text-xs px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
                 />
               )}
               {masterRequired && (
-                <input
-                  type="password"
+                <PasswordInput
+                  wrapperClassName="mb-1.5"
                   value={deleteMasterPass}
                   onChange={(e) => { setDeleteMasterPass(e.target.value); setError(null); }}
                   placeholder={t('profile.masterPasswordPlaceholder')}
-                  className="w-full text-xs px-2 py-1.5 mb-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
+                  className="w-full text-xs px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
                 />
               )}
               {error && <p className="text-[10px] text-red-400 mt-1 mb-1 px-0.5">{error}</p>}
@@ -406,8 +406,8 @@ export function ProfileSelector() {
                 className="w-full text-xs px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
                 maxLength={50}
               />
-              <input
-                type="password"
+              <PasswordInput
+                wrapperClassName="mt-1"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 onKeyDown={(e) => {
@@ -415,11 +415,11 @@ export function ProfileSelector() {
                   if (e.key === 'Escape') closeAll();
                 }}
                 placeholder={t('profile.newPasswordPlaceholder')}
-                className="w-full text-xs px-2 py-1.5 mt-1 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
+                className="w-full text-xs px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
               />
               {newPassword && (
-                <input
-                  type="password"
+                <PasswordInput
+                  wrapperClassName="mt-1"
                   value={newPasswordConfirm}
                   onChange={(e) => setNewPasswordConfirm(e.target.value)}
                   onKeyDown={(e) => {
@@ -427,17 +427,17 @@ export function ProfileSelector() {
                     if (e.key === 'Escape') closeAll();
                   }}
                   placeholder={t('profile.confirmPasswordPlaceholder')}
-                  className="w-full text-xs px-2 py-1.5 mt-1 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
+                  className="w-full text-xs px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
                 />
               )}
               {masterRequired && (
-                <input
-                  type="password"
+                <PasswordInput
+                  wrapperClassName="mt-1"
                   value={masterPasswordVal}
                   onChange={(e) => { setMasterPasswordVal(e.target.value); setError(null); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); }}
                   placeholder={t('profile.masterPasswordPlaceholder')}
-                  className="w-full text-xs px-2 py-1.5 mt-1 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
+                  className="w-full text-xs px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
                 />
               )}
               {error && (

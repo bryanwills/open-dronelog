@@ -23,6 +23,8 @@ services:
       # - SYNC_INTERVAL=0 0 */8 * * *
       # Uncomment to customize session token lifetime (default: 24 hours)
       # - SESSION_TTL_HOURS=24
+      # Uncomment to require a master password for creating new profiles
+      # - PROFILE_CREATION_PASS=your_master_password_here
     restart: unless-stopped
 
 volumes:

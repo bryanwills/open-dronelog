@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '@/i18n';
 import { useFlightStore } from '@/stores/flightStore';
 import { Dashboard } from '@/components/dashboard/Dashboard';
+import { PasswordInput } from '@/components/ui/PasswordInput';
 import { isWebMode } from '@/lib/api';
 
 /** Loading overlay shown during database initialization/migration */
@@ -171,13 +172,13 @@ function InitializationOverlay() {
 
             {profilePasswords[selectedProfile] ? (
               <>
-                <input
-                  type="password"
+                <PasswordInput
+                  wrapperClassName="mb-2"
                   value={authPassword}
                   onChange={(e) => { setAuthPassword(e.target.value); setAuthError(null); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAuth(); }}
                   placeholder={t('profile.passwordPlaceholder')}
-                  className="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-drone-primary"
                   autoFocus
                 />
                 {authError && (
