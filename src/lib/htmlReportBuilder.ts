@@ -398,6 +398,7 @@ export interface ReportOptions {
   locale?: string;
   dateLocale?: string;
   timeFormat?: '12h' | '24h';
+  t?: (key: string, options?: any) => string;
 }
 
 interface ComponentGroup {
@@ -418,24 +419,26 @@ function buildFlightColumns(
   locale?: string,
   dateLocale?: string,
   hour12?: boolean,
+  t?: (key: string, options?: any) => string,
 ): FlightColumn[] {
   const columns: FlightColumn[] = [];
   const dl = dateLocale || locale;
+  const tr = (key: string, fallback: string) => t ? t(key) : fallback;
 
   // 1. General Info Column
   const generalItems: { label: string; value: string }[] = [];
-  if (fc.flightName) generalItems.push({ label: 'Flight Name', value: esc(fd.flight.displayName || fd.flight.fileName) });
-  if (fc.flightDateTime) generalItems.push({ label: 'Date/Time', value: esc(fmtDateTimeFull(fd.flight.startTime, dl, hour12)) });
-  if (fc.takeoffTime) generalItems.push({ label: 'Takeoff', value: esc(fmtTimeFull(fd.flight.startTime, dl, hour12)) });
-  if (fc.landingTime) generalItems.push({ label: 'Landing', value: esc(calculateLandingTime(fd.flight.startTime, fd.flight.durationSecs, dl, hour12)) });
-  if (fc.duration) generalItems.push({ label: 'Duration', value: esc(fmtDuration(fd.flight.durationSecs)) });
+  if (fc.flightName) generalItems.push({ label: tr('report.flightName', 'Flight Name'), value: esc(fd.flight.displayName || fd.flight.fileName) });
+  if (fc.flightDateTime) generalItems.push({ label: tr('report.dateTime', 'Date/Time'), value: esc(fmtDateTimeFull(fd.flight.startTime, dl, hour12)) });
+  if (fc.takeoffTime) generalItems.push({ label: tr('report.takeoff', 'Takeoff'), value: esc(fmtTimeFull(fd.flight.startTime, dl, hour12)) });
+  if (fc.landingTime) generalItems.push({ label: tr('report.landing', 'Landing'), value: esc(calculateLandingTime(fd.flight.startTime, fd.flight.durationSecs, dl, hour12)) });
+  if (fc.duration) generalItems.push({ label: tr('report.duration', 'Duration'), value: esc(fmtDuration(fd.flight.durationSecs)) });
   if (fc.takeoffCoordinates) {
     const lat = fd.flight.homeLat ?? fd.data.telemetry.latitude?.[0];
     const lon = fd.flight.homeLon ?? fd.data.telemetry.longitude?.[0];
-    generalItems.push({ label: 'Takeoff Location', value: lat != null && lon != null ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}` : '—' });
+    generalItems.push({ label: tr('report.takeoffLocation', 'Takeoff Location'), value: lat != null && lon != null ? `${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}` : '—' });
   }
-  if (fc.notes && fd.flight.notes) generalItems.push({ label: 'Notes', value: esc(fd.flight.notes) });
-  if (generalItems.length > 0) columns.push({ isStacked: false, groups: [{ group: 'General Info', items: generalItems }] });
+  if (fc.notes && fd.flight.notes) generalItems.push({ label: tr('report.notes', 'Notes'), value: esc(fd.flight.notes) });
+  if (generalItems.length > 0) columns.push({ isStacked: false, groups: [{ group: tr('report.generalInfo', 'General Info'), items: generalItems }] });
 
   // 2. Equipment Column
   const equipItems: { label: string; value: string }[] = [];
@@ -443,23 +446,23 @@ function buildFlightColumns(
     const fallback = fd.flight.aircraftName || fd.flight.droneModel || '';
     const name = fd.flight.droneSerial && fd.getDroneDisplayName
       ? fd.getDroneDisplayName(fd.flight.droneSerial, fallback) : fallback;
-    equipItems.push({ label: 'Aircraft', value: esc(name || '—') });
+    equipItems.push({ label: tr('report.aircraft', 'Aircraft'), value: esc(name || '—') });
   }
-  if (fc.droneModel) equipItems.push({ label: 'Drone Model', value: esc(fd.flight.droneModel || '—') });
-  if (fc.droneSerial) equipItems.push({ label: 'Drone SN', value: esc(fd.flight.droneSerial || '—') });
+  if (fc.droneModel) equipItems.push({ label: tr('report.droneModel', 'Drone Model'), value: esc(fd.flight.droneModel || '—') });
+  if (fc.droneSerial) equipItems.push({ label: tr('report.droneSN', 'Drone SN'), value: esc(fd.flight.droneSerial || '—') });
   if (fc.batterySerial) {
-    equipItems.push({ label: 'Battery SN', value: esc(fd.flight.batterySerial || '—') });
+    equipItems.push({ label: tr('report.batterySN', 'Battery SN'), value: esc(fd.flight.batterySerial || '—') });
   }
-  if (equipItems.length > 0) columns.push({ isStacked: false, groups: [{ group: 'Equipment', items: equipItems }] });
+  if (equipItems.length > 0) columns.push({ isStacked: false, groups: [{ group: tr('report.equipment', 'Equipment'), items: equipItems }] });
 
   // 3. Performance Column (Flight Stats + Battery merged)
   const perfItems: { label: string; value: string }[] = [];
-  if (fc.totalDistance) perfItems.push({ label: 'Distance', value: esc(fmtDistance(fd.flight.totalDistance, unitSystem, locale)) });
-  if (fc.maxAltitude) perfItems.push({ label: 'Max Alt.', value: esc(fmtAltitude(fd.flight.maxAltitude, unitSystem, locale)) });
-  if (fc.maxSpeed) perfItems.push({ label: 'Max Speed', value: esc(fmtSpeed(fd.flight.maxSpeed, unitSystem, locale)) });
+  if (fc.totalDistance) perfItems.push({ label: tr('report.distance', 'Distance'), value: esc(fmtDistance(fd.flight.totalDistance, unitSystem, locale)) });
+  if (fc.maxAltitude) perfItems.push({ label: tr('report.maxAlt', 'Max Alt.'), value: esc(fmtAltitude(fd.flight.maxAltitude, unitSystem, locale)) });
+  if (fc.maxSpeed) perfItems.push({ label: tr('report.maxSpeed', 'Max Speed'), value: esc(fmtSpeed(fd.flight.maxSpeed, unitSystem, locale)) });
   if (fc.maxDistanceFromHome) {
     const d = calculateMaxDistanceFromHome(fd.data.telemetry);
-    perfItems.push({ label: 'Max Dist. Home', value: esc(fmtDistance(d, unitSystem, locale)) });
+    perfItems.push({ label: tr('report.maxDistHome', 'Max Dist. Home'), value: esc(fmtDistance(d, unitSystem, locale)) });
   }
   if (fc.takeoffBattery) {
     const b = fd.data.telemetry.battery;
@@ -479,7 +482,7 @@ function buildFlightColumns(
         ? `${firstBat}% (${firstVolt.toFixed(2)} V)`
         : `${firstBat}%`;
     }
-    perfItems.push({ label: 'Takeoff Bat.', value: takeoffValue });
+    perfItems.push({ label: tr('report.takeoffBat', 'Takeoff Bat.'), value: takeoffValue });
   }
   if (fc.landingBattery) {
     const b = fd.data.telemetry.battery;
@@ -498,30 +501,30 @@ function buildFlightColumns(
         ? `${lastBat}% (${lastVolt.toFixed(2)} V)`
         : `${lastBat}%`;
     }
-    perfItems.push({ label: 'Landing Bat.', value: landingValue });
+    perfItems.push({ label: tr('report.landingBat', 'Landing Bat.'), value: landingValue });
   }
   if (fc.batteryTemp) {
     const t = fd.data.telemetry.batteryTemp;
     const first = t?.find((val) => val !== null);
     if (first != null) {
-      perfItems.push({ label: 'Bat. Temp', value: unitSystem === 'imperial' ? `${(first * 9 / 5 + 32).toFixed(1)} °F` : `${first.toFixed(1)} °C` });
+      perfItems.push({ label: tr('report.batTemp', 'Bat. Temp'), value: unitSystem === 'imperial' ? `${(first * 9 / 5 + 32).toFixed(1)} °F` : `${first.toFixed(1)} °C` });
     } else {
-      perfItems.push({ label: 'Bat. Temp', value: '—' });
+      perfItems.push({ label: tr('report.batTemp', 'Bat. Temp'), value: '—' });
     }
   }
-  if (perfItems.length > 0) columns.push({ isStacked: false, groups: [{ group: 'Performance', items: perfItems }] });
+  if (perfItems.length > 0) columns.push({ isStacked: false, groups: [{ group: tr('report.performance', 'Performance'), items: perfItems }] });
 
   // 4. Weather Column
   const wxItems: { label: string; value: string }[] = [];
-  if (fc.weatherCondition) wxItems.push({ label: 'Condition', value: esc(fd.weather?.conditionLabel ?? '—') });
-  if (fc.temperature) wxItems.push({ label: 'Temperature', value: fd.weather ? esc(fmtTemp(fd.weather.temperature, unitSystem, locale)) : '—' });
-  if (fc.windSpeed) wxItems.push({ label: 'Wind', value: fd.weather ? esc(fmtWindSpeed(fd.weather.windSpeed, unitSystem, locale)) : '—' });
-  if (fc.windGusts) wxItems.push({ label: 'Gusts', value: fd.weather ? esc(fmtWindSpeed(fd.weather.windGusts, unitSystem, locale)) : '—' });
-  if (fc.humidity) wxItems.push({ label: 'Humidity', value: fd.weather && fd.weather.humidity != null ? `${fd.weather.humidity}%` : '—' });
-  if (fc.cloudCover) wxItems.push({ label: 'Clouds', value: fd.weather && fd.weather.cloudCover != null ? `${fd.weather.cloudCover}%` : '—' });
-  if (fc.precipitation) wxItems.push({ label: 'Precipitation', value: fd.weather ? esc(fmtPrecip(fd.weather.precipitation, unitSystem, locale)) : '—' });
-  if (fc.pressure) wxItems.push({ label: 'Pressure', value: fd.weather ? esc(fmtPressure(fd.weather.pressure, unitSystem, locale)) : '—' });
-  if (wxItems.length > 0 && wxItems.some((i) => i.value !== '—')) columns.push({ isStacked: false, groups: [{ group: 'Weather', items: wxItems }] });
+  if (fc.weatherCondition) wxItems.push({ label: tr('report.condition', 'Condition'), value: esc(fd.weather?.conditionLabel ?? '—') });
+  if (fc.temperature) wxItems.push({ label: tr('report.temperature', 'Temperature'), value: fd.weather ? esc(fmtTemp(fd.weather.temperature, unitSystem, locale)) : '—' });
+  if (fc.windSpeed) wxItems.push({ label: tr('report.wind', 'Wind'), value: fd.weather ? esc(fmtWindSpeed(fd.weather.windSpeed, unitSystem, locale)) : '—' });
+  if (fc.windGusts) wxItems.push({ label: tr('report.gusts', 'Gusts'), value: fd.weather ? esc(fmtWindSpeed(fd.weather.windGusts, unitSystem, locale)) : '—' });
+  if (fc.humidity) wxItems.push({ label: tr('report.humidity', 'Humidity'), value: fd.weather && fd.weather.humidity != null ? `${fd.weather.humidity}%` : '—' });
+  if (fc.cloudCover) wxItems.push({ label: tr('report.clouds', 'Clouds'), value: fd.weather && fd.weather.cloudCover != null ? `${fd.weather.cloudCover}%` : '—' });
+  if (fc.precipitation) wxItems.push({ label: tr('report.precipitation', 'Precipitation'), value: fd.weather ? esc(fmtPrecip(fd.weather.precipitation, unitSystem, locale)) : '—' });
+  if (fc.pressure) wxItems.push({ label: tr('report.pressure', 'Pressure'), value: fd.weather ? esc(fmtPressure(fd.weather.pressure, unitSystem, locale)) : '—' });
+  if (wxItems.length > 0 && wxItems.some((i) => i.value !== '—')) columns.push({ isStacked: false, groups: [{ group: tr('report.weatherGroup', 'Weather'), items: wxItems }] });
 
   // 5. Stacked Column (Tags over Media)
   const stackedGroups: ComponentGroup[] = [];
@@ -542,21 +545,21 @@ function buildFlightColumns(
     if (includedTags.length > 0) {
       // Build a comma separated string for the tags list
       const tagString = includedTags.map(t => t.tag).join(', ');
-      tagItems.push({ label: 'Included Tags', value: esc(tagString) });
+      tagItems.push({ label: tr('report.includedTags', 'Included Tags'), value: esc(tagString) });
     } else if (flightTags.length === 0) {
-      tagItems.push({ label: 'Included Tags', value: 'None' });
+      tagItems.push({ label: tr('report.includedTags', 'Included Tags'), value: tr('report.noTags', 'None') });
     } else {
-      tagItems.push({ label: 'Included Tags', value: 'None matching selection' });
+      tagItems.push({ label: tr('report.includedTags', 'Included Tags'), value: tr('report.noMatchingTags', 'None matching selection') });
     }
 
-    if (tagItems.length > 0) stackedGroups.push({ group: 'Tags', items: tagItems });
+    if (tagItems.length > 0) stackedGroups.push({ group: tr('report.tagsGroup', 'Tags'), items: tagItems });
   }
 
   // ... 5b. Media (Bottom Half)
   const mediaItems: { label: string; value: string }[] = [];
-  if (fc.photoCount) mediaItems.push({ label: 'Photos', value: fd.flight.photoCount != null && fd.flight.photoCount > 0 ? String(fd.flight.photoCount) : '—' });
-  if (fc.videoCount) mediaItems.push({ label: 'Videos', value: fd.flight.videoCount != null && fd.flight.videoCount > 0 ? String(fd.flight.videoCount) : '—' });
-  if (mediaItems.length > 0) stackedGroups.push({ group: 'Media', items: mediaItems });
+  if (fc.photoCount) mediaItems.push({ label: tr('report.photos', 'Photos'), value: fd.flight.photoCount != null && fd.flight.photoCount > 0 ? String(fd.flight.photoCount) : '—' });
+  if (fc.videoCount) mediaItems.push({ label: tr('report.videos', 'Videos'), value: fd.flight.videoCount != null && fd.flight.videoCount > 0 ? String(fd.flight.videoCount) : '—' });
+  if (mediaItems.length > 0) stackedGroups.push({ group: tr('report.mediaGroup', 'Media'), items: mediaItems });
 
   if (stackedGroups.length > 0) {
     // If it contains more than one group (Tags AND Media), it is stacked
@@ -581,9 +584,11 @@ export function buildHtmlReport(
     locale,
     dateLocale,
     timeFormat,
+    t,
   } = options;
   const dl = dateLocale || locale;
   const hour12 = timeFormat === '24h' ? false : true;
+  const tr = (key: string, fallback: string) => t ? t(key) : fallback;
 
   // Group flights by day
   type DayGroup = { date: string; dateLabel: string; flights: FlightReportData[] };
@@ -860,14 +865,14 @@ export function buildHtmlReport(
   <div class="report-header">
     <div>
       <h1>${esc(documentTitle)}</h1>
-      <div class="subtitle">Comprehensive drone flights summary</div>
+      <div class="subtitle">${esc(tr('report.comprehensiveSummary', 'Comprehensive drone flights summary'))}</div>
     </div>
     <div class="meta">
-      <div><strong>Pilot:</strong> ${esc(pilotName)}</div>
-      <div><strong>Reported Flights:</strong> ${totalFlights}</div>
-      <div><strong>Total Air Time:</strong> ${esc(fmtDuration(totalDuration))}</div>
-      <div><strong>Total Distance:</strong> ${esc(fmtDistance(totalDistanceM, unitSystem, locale))}</div>
-      <div><strong>Generated:</strong> ${esc(now)}</div>
+      <div><strong>${esc(tr('report.pilot', 'Pilot:'))}</strong> ${esc(pilotName)}</div>
+      <div><strong>${esc(tr('report.reportedFlights', 'Reported Flights:'))}</strong> ${totalFlights}</div>
+      <div><strong>${esc(tr('report.totalAirTime', 'Total Air Time:'))}</strong> ${esc(fmtDuration(totalDuration))}</div>
+      <div><strong>${esc(tr('overview.totalDistance', 'Total Distance:'))}</strong> ${esc(fmtDistance(totalDistanceM, unitSystem, locale))}</div>
+      <div><strong>${esc(tr('report.generated', 'Generated:'))}</strong> ${esc(now)}</div>
     </div>
   </div>
 
@@ -875,19 +880,19 @@ export function buildHtmlReport(
   <div class="summary-row">
     <div class="summary-card">
       <div class="value">${totalFlights}</div>
-      <div class="label">Total Flights</div>
+      <div class="label">${esc(tr('overview.totalFlights', 'Total Flights'))}</div>
     </div>
     <div class="summary-card">
       <div class="value">${esc(fmtDuration(totalDuration))}</div>
-      <div class="label">Total Air Time</div>
+      <div class="label">${esc(tr('report.totalAirTime', 'Total Air Time:').replace(':', ''))}</div>
     </div>
     <div class="summary-card">
       <div class="value">${esc(fmtDistance(totalDistanceM, unitSystem, locale))}</div>
-      <div class="label">Total Distance</div>
+      <div class="label">${esc(tr('overview.totalDistance', 'Total Distance'))}</div>
     </div>
     <div class="summary-card">
       <div class="value">${days.length}</div>
-      <div class="label">Flight Days</div>
+      <div class="label">${esc(tr('report.flightDays', 'Flight Days'))}</div>
     </div>
   </div>
 
@@ -897,11 +902,14 @@ export function buildHtmlReport(
 
   for (const day of days) {
     // Day header
-    html += `  <div class="day-header">${CALENDAR_SVG} ${esc(day.dateLabel)} — ${day.flights.length} flight${day.flights.length !== 1 ? 's' : ''}</div>\n`;
+    const flightCountLabel = day.flights.length === 1
+      ? tr('report.flightCount_one', '1 flight').replace('{{count}}', '1')
+      : tr('report.flightCount_other', '{{count}} flights').replace('{{count}}', String(day.flights.length));
+    html += `  <div class="day-header">${CALENDAR_SVG} ${esc(day.dateLabel)} — ${esc(flightCountLabel)}</div>\n`;
 
     for (const fd of day.flights) {
       globalFlightIndex++;
-      const flightColumns = buildFlightColumns(fd, fc, unitSystem, locale, dl, hour12);
+      const flightColumns = buildFlightColumns(fd, fc, unitSystem, locale, dl, hour12, t);
       const headerLabel = fd.flight.displayName || fd.flight.fileName || `Flight ${globalFlightIndex}`;
 
       html += `  <div class="flight-card">
@@ -943,19 +951,27 @@ export function buildHtmlReport(
     // Day subtotal
     const dayDuration = day.flights.reduce((s, fd) => s + (fd.flight.durationSecs || 0), 0);
     const dayDistance = day.flights.reduce((s, fd) => s + (fd.flight.totalDistance || 0), 0);
-    html += `  <div class="subtotal">Subtotal: ${day.flights.length} flight${day.flights.length !== 1 ? 's' : ''} · ${esc(fmtDuration(dayDuration))} · ${esc(fmtDistance(dayDistance, unitSystem, locale))}</div>\n`;
+    const dayFlightCountLabel = day.flights.length === 1
+      ? tr('report.flightCount_one', '1 flight').replace('{{count}}', '1')
+      : tr('report.flightCount_other', '{{count}} flights').replace('{{count}}', String(day.flights.length));
+
+    html += `  <div class="subtotal">${esc(tr('report.subtotal', 'Subtotal:'))} ${esc(dayFlightCountLabel)} · ${esc(fmtDuration(dayDuration))} · ${esc(fmtDistance(dayDistance, unitSystem, locale))}</div>\n`;
   }
 
   // Grand total
-  html += `  <div class="grand-total">Grand Total: ${totalFlights} flights · ${esc(fmtDuration(totalDuration))} · ${esc(fmtDistance(totalDistanceM, unitSystem, locale))}</div>\n`;
+  const totalFlightCountLabel = totalFlights === 1
+    ? tr('report.flightCount_one', '1 flight').replace('{{count}}', '1')
+    : tr('report.flightCount_other', '{{count}} flights').replace('{{count}}', String(totalFlights));
+
+  html += `  <div class="grand-total">${esc(tr('report.grandTotal', 'Grand Total:'))} ${esc(totalFlightCountLabel)} · ${esc(fmtDuration(totalDuration))} · ${esc(fmtDistance(totalDistanceM, unitSystem, locale))}</div>\n`;
 
   // Footer
   html += `
   <div class="report-footer">
-    <div>Generated on ${esc(now)}</div>
+    <div>${esc(tr('report.generated', 'Generated:').replace(':', ' on'))} ${esc(now)}</div>
     <div class="branding">
       <svg viewBox="0 0 1024 1024" style="width:18px;height:18px"><defs><style>.r{fill:#ba3935}.p{fill:#8e45ab}</style></defs><path class="r" d="M99.63,382.45h1c10.41-.19,19.67-.28,28.33-.28,10,0,19.25.12,28.14.37l1.61,0c17.87,0,28.1-9.63,30.39-28.62,9.73-80.81,65.78-142.85,146.27-161.88,43.9-10.38,47.45-14.93,47.49-60.93v-8.51c0-5.44,0-10.88,0-16.31-.15-12.07-.43-34.53-24.41-34.53A69.26,69.26,0,0,0,345,73.38c-6.09,1.21-12.24,2.34-18.4,3.48-24.78,4.55-50.41,9.27-73.81,19.62C144.53,144.35,83.7,230.06,72,351.24c-1,9.84,1.09,17.6,6.07,23.08S90.2,382.45,99.63,382.45Z"/><path class="r" d="M382.8,893.51c-.05-46.24-3.59-50.81-47.3-61.07-81.79-19.2-135.24-78.89-146.65-163.76-2.44-18.17-12.37-27.38-29.52-27.38l-1.45,0c-10.71.29-20.34.44-29.45.44-9.5,0-18.27-.15-26.82-.47-.71,0-1.4,0-2.06,0-9.34,0-16.24,2.51-21.11,7.67-6.78,7.19-7,17-6.65,23.8C79.9,812.67,186.22,928.94,324.58,949.19c13,1.9,22.39,3.28,29.78,3.28h0c5.68,0,13.93-.72,20.09-6.89,8.43-8.44,8.41-21.11,8.36-46.38Z"/><path class="r" d="M667.67,189.05c93,12.06,154.05,73.05,167.59,167.34,2.48,17.28,12.29,26,29.17,26h.77c9.53-.13,19.06-.24,28.6-.24,10.21,0,19.34.12,27.9.37l1.72,0c9.86,0,17.12-2.67,22.19-8.17,5.29-5.74,7.42-14,6.51-25.1-5.61-68.57-32.39-131-77.44-180.53C829.38,119,769.94,87,702.78,76.34l-9.31-1.5c-12-2-20.59-3.36-27.26-3.36-5,0-12.16.64-17.73,6.25-7.5,7.55-7.42,18.79-7.28,39.19q0,4.9,0,10.72v3.8l.07,11.4h.12c.07,5.65.1,11.06-.21,16.43C640.23,176.63,649.12,186.65,667.67,189.05Z"/><path class="r" d="M925,641.45h-.75c-10,.15-19.94.26-29.91.26-10.31,0-19.62-.11-28.45-.36h-1.43c-17.15,0-27,9.29-29.31,27.62-10.44,83.17-65.25,144.29-146.61,163.49-43.73,10.32-47.27,14.87-47.29,60.95V899l0,4.29c-.21,24.21-.31,35.26,7.34,43,5.53,5.58,12.75,6.22,17.69,6.22,5.38,0,11.7-.84,20.46-2,3.17-.42,6.66-.89,10.48-1.36,66.32-8.2,129.26-41.61,177.23-94.09s75.51-117.88,77.72-184.36c.32-9.64-1.92-16.8-6.86-21.9C940.56,643.92,933.74,641.45,925,641.45Z"/><path class="p" d="M673.71,776,695,767.7c42-20.74,69-47.54,85.56-96.59,6.2-18.38-3.13-29.92-21.16-36.09-56.87-19.44-90.77-65.55-90.67-123.35.1-57.27,34.36-103.15,91.65-122.72,17.38-5.94,23.64-16.76,20.3-35.1A137.31,137.31,0,0,0,677,244.82,59.18,59.18,0,0,0,663.27,243c-19,0-26.34,14.64-30.19,25.65-18,51.52-63.09,85.61-114.86,86.85-1.25,0-2.48.05-3.72.05-58.71,0-104.82-32.77-123.33-87.64-3.61-10.71-10.56-24.93-29.18-24.93a56,56,0,0,0-13.61,2c-54.66,13.65-89.56,48.36-103.73,103.16-5.72,22.13,1.44,35.25,23.21,42.55,66.06,22.13,101.91,89.26,83.38,156.15-11.95,43.13-41.2,72.93-86.94,88.54-7.56,2.58-25.26,8.62-21.62,32.41,8.21,53.67,50.91,99.63,103.84,111.78a61.18,61.18,0,0,0,13.77,1.81c19.61,0,26.87-14.35,31-26.86,17-51.44,62.92-85,116.92-85.48h1.37c57.95,0,104.4,33,124.26,88.24.12.33.26.68.43,1.07C640.83,773.3,658,780.71,673.71,776ZM512,573.32a61.21,61.21,0,1,1,61.21-61.21A61.2,61.2,0,0,1,512,573.32Z"/></svg>
-      Generated with <a href="https://opendronelog.com" target="_blank" rel="noopener noreferrer">Open Drone Log</a> (opendronelog.com)
+      ${esc(tr('report.generatedWith', 'Generated with'))} <a href="https://opendronelog.com" target="_blank" rel="noopener noreferrer">Open Drone Log</a> (opendronelog.com)
     </div>
   </div>
 

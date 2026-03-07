@@ -1333,6 +1333,7 @@ export function FlightList({
         locale,
         dateLocale,
         timeFormat,
+        t,
       });
 
       if (isWebMode()) {

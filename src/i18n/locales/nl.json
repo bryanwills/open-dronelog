@@ -552,7 +552,18 @@
     "photoCount": "Foto's",
     "videoCount": "Video's",
     "manualTags": "Handmatige tags",
-    "autoTags": "Automatische tags"
+    "autoTags": "Automatische tags",
+    "comprehensiveSummary": "Uitgebreide samenvatting van dronevluchten",
+    "pilot": "Piloot:",
+    "reportedFlights": "Gerapporteerde vluchten:",
+    "totalAirTime": "Totale vliegtijd:",
+    "generated": "Gegenereerd:",
+    "flightDays": "Vliegdagen",
+    "subtotal": "Subtotaal:",
+    "grandTotal": "Eindtotaal:",
+    "flightCount_one": "{{count}} vlucht",
+    "flightCount_other": "{{count}} vluchten",
+    "generatedWith": "Gegenereerd met"
   },
   "map": {
     "startToEnd": "Start → Einde",

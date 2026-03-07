@@ -552,7 +552,18 @@
     "photoCount": "写真",
     "videoCount": "動画",
     "manualTags": "手動タグ",
-    "autoTags": "自動タグ"
+    "autoTags": "自動タグ",
+    "comprehensiveSummary": "ドローンフライトの総合的な概要",
+    "pilot": "パイロット:",
+    "reportedFlights": "報告されたフライト:",
+    "totalAirTime": "合計飛行時間:",
+    "generated": "生成日時:",
+    "flightDays": "飛行日数",
+    "subtotal": "小計:",
+    "grandTotal": "総計:",
+    "flightCount_one": "{{count}} フライト",
+    "flightCount_other": "{{count}} フライト",
+    "generatedWith": "生成元:"
   },
   "map": {
     "startToEnd": "開始 → 終了",

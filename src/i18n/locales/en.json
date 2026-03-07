@@ -553,7 +553,18 @@
     "photoCount": "Photos",
     "videoCount": "Videos",
     "manualTags": "Manual Tags",
-    "autoTags": "Auto Tags"
+    "autoTags": "Auto Tags",
+    "comprehensiveSummary": "Comprehensive drone flights summary",
+    "pilot": "Pilot:",
+    "reportedFlights": "Reported Flights:",
+    "totalAirTime": "Total Air Time:",
+    "generated": "Generated:",
+    "flightDays": "Flight Days",
+    "subtotal": "Subtotal:",
+    "grandTotal": "Grand Total:",
+    "flightCount_one": "{{count}} flight",
+    "flightCount_other": "{{count}} flights",
+    "generatedWith": "Generated with"
   },
   "map": {
     "startToEnd": "Start → End",

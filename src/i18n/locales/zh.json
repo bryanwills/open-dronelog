@@ -552,7 +552,18 @@
     "photoCount": "照片",
     "videoCount": "视频",
     "manualTags": "手动标签",
-    "autoTags": "自动标签"
+    "autoTags": "自动标签",
+    "comprehensiveSummary": "全面无人机飞行摘要",
+    "pilot": "飞行员:",
+    "reportedFlights": "报告的飞行:",
+    "totalAirTime": "总飞行时间:",
+    "generated": "生成于:",
+    "flightDays": "飞行天数",
+    "subtotal": "小计:",
+    "grandTotal": "总计:",
+    "flightCount_one": "{{count}} 次飞行",
+    "flightCount_other": "{{count}} 次飞行",
+    "generatedWith": "生成应用"
   },
   "map": {
     "startToEnd": "起点 → 终点",

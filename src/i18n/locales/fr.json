@@ -552,7 +552,18 @@
     "photoCount": "Photos",
     "videoCount": "Vidéos",
     "manualTags": "Tags manuels",
-    "autoTags": "Tags automatiques"
+    "autoTags": "Tags automatiques",
+    "comprehensiveSummary": "Résumé complet des vols de drones",
+    "pilot": "Pilote :",
+    "reportedFlights": "Vols signalés :",
+    "totalAirTime": "Temps de vol total :",
+    "generated": "Généré :",
+    "flightDays": "Jours de vol",
+    "subtotal": "Sous-total :",
+    "grandTotal": "Total général :",
+    "flightCount_one": "{{count}} vol",
+    "flightCount_other": "{{count}} vols",
+    "generatedWith": "Généré avec"
   },
   "map": {
     "startToEnd": "Début → Fin",

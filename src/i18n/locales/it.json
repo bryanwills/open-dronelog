@@ -552,7 +552,18 @@
     "photoCount": "Foto",
     "videoCount": "Video",
     "manualTags": "Tag manuali",
-    "autoTags": "Tag automatici"
+    "autoTags": "Tag automatici",
+    "comprehensiveSummary": "Riepilogo completo dei voli con droni",
+    "pilot": "Pilota:",
+    "reportedFlights": "Voli segnalati:",
+    "totalAirTime": "Tempo di volo totale:",
+    "generated": "Generato:",
+    "flightDays": "Giorni di volo",
+    "subtotal": "Subtotale:",
+    "grandTotal": "Totale generale:",
+    "flightCount_one": "{{count}} volo",
+    "flightCount_other": "{{count}} voli",
+    "generatedWith": "Generato con"
   },
   "map": {
     "startToEnd": "Inizio → Fine",

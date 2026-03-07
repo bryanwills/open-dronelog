@@ -552,7 +552,18 @@
     "photoCount": "사진",
     "videoCount": "동영상",
     "manualTags": "수동 태그",
-    "autoTags": "자동 태그"
+    "autoTags": "자동 태그",
+    "comprehensiveSummary": "종합 드론 비행 요약",
+    "pilot": "조종사:",
+    "reportedFlights": "보고된 비행:",
+    "totalAirTime": "총 비행 시간:",
+    "generated": "생성됨:",
+    "flightDays": "비행 일수",
+    "subtotal": "소계:",
+    "grandTotal": "총계:",
+    "flightCount_one": "{{count}} 비행",
+    "flightCount_other": "{{count}} 비행",
+    "generatedWith": "생성 도구:"
   },
   "map": {
     "startToEnd": "시작 → 끝",
