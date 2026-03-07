@@ -95,8 +95,8 @@
 - **Local-First Storage**: All data in a local DuckDB database. No cloud upload required (except DJI key fetch during first import).
 - **Smart Tags**: Auto-tagging (Night Flight, High Speed, Low Battery, etc.) and offline reverse geocoding for location tags. Manual tags and bulk operations supported.on.
 - **Filters & Search**: Date range, drone/battery/color filters, duration/altitude/distance sliders, tag filter, map area filter, and filter inversion.
-- **Overview Dashboard**: Aggregate stats, activity heatmap, pie charts by drone/battery/duration, cluster map, and top-flight highlights.
-- **Battery Health**: Per-battery health bars, serial renaming, and per-minute usage history with zoom.
+- **Overview Dashboard**: Aggregate stats, activity heatmap, pie charts by drone/battery/duration, time-of-day radial chart, cluster map with optional heatmap layer, and top-flight highlights.
+- **Battery Health**: Per-battery health bars with cycle count tracking, serial renaming, and per-minute usage history with zoom.
 - **Maintenance Tracking**: Configurable thresholds with color-coded progress bars and date-based maintenance recording.
 - **Exports**: CSV, JSON, GPX, KML, and Summary CSV export. FlyCard generator for shareable 1080x1080 social media images.
 - **HTML Report**: Generate a configurable, print-ready flight regulation report (A4 layout) with selectable field groups, weather data, and day-by-day grouping. Can be printed as PDF via Ctrl+P. Pilot name and field preferences can be customized and will persist across sessions.

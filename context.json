@@ -2,7 +2,7 @@
   "project": {
     "name": "Open DroneLog",
     "description": "Local-first drone flight log viewer and analyzer with telemetry charts, 3D flight maps, and analytics. Supports DJI, Litchi CSV, and Airdata CSV formats. Available as a Tauri v2 desktop app or a Docker-deployable web app.",
-    "version": "2.26.0",
+    "version": "2.28.1",
     "license": "AGPL-3.0-only",
     "repository": "https://github.com/arpanghosh8453/open-dronelog",
     "mirror": "https://codeberg.org/arpanghosh8453/open-dronelog"
@@ -58,7 +58,7 @@
         "entry_point": "src-tauri/src/server.rs (build_router)"
       }
     },
-    "frontend_backend_bridge": "src/lib/api.ts — unified adapter that routes to invoke() for Tauri or fetch() for web. All @tauri-apps imports are lazy/dynamic.",
+    "frontend_backend_bridge": "src/lib/api.ts — unified adapter that routes to invoke() for Tauri or fetch() for web. All @tauri-apps imports are lazy/dynamic. Profile session tokens use a hybrid sessionStorage/localStorage strategy (tab-scoped reads with persistent fallback) via getProfileKey/setProfileKey/removeProfileKey helpers.",
     "data_flow": {
       "import": [
         "User selects file(s) via native dialog (desktop) or HTML input / drag-drop (web)",
@@ -115,17 +115,18 @@
         "dashboard/HtmlReportModal.tsx": "HTML report configuration and generation",
         "dashboard/FlyCardGenerator.tsx": "Shareable 1080×1080 flight stats image generator",
         "dashboard/FlightMessagesModal.tsx": "Scrollable list of flight tips/warnings with timestamps and color coding",
-        "dashboard/FlightClusterMap.tsx": "Overview map with flight location clusters and map area filter",
+        "dashboard/FlightClusterMap.tsx": "Overview map with flight location clusters, optional heatmap layer, and map area filter",
         "dashboard/ColorPickerModal.tsx": "Color picker for assigning custom colors to flights",
         "charts/TelemetryCharts.tsx": "Synchronized ECharts panels with configurable field selection",
         "map/FlightMap.tsx": "3D flight map with deck.gl overlay, replay system, telemetry overlay, RC joystick visualization",
-        "ui/Select.tsx": "Searchable dropdown with keyboard navigation and multi-select support"
+        "ui/Select.tsx": "Searchable dropdown with keyboard navigation and multi-select support",
+      "ui/PasswordInput.tsx": "Reusable password input with eye toggle for visibility"
       },
       "state": {
         "stores/flightStore.ts": "Zustand store: flights, telemetry cache, filters, tags, equipment names, theme, units, language, supporter badge, maintenance, map state. Syncs with localStorage and database API."
       },
       "lib": {
-        "api.ts": "Backend adapter: invoke() for Tauri, fetch() for web. Unified interface for all backend operations.",
+        "api.ts": "Backend adapter: invoke() for Tauri, fetch() for web. Unified interface for all backend operations. Includes hybrid sessionStorage/localStorage profile key helpers (getProfileKey, setProfileKey, removeProfileKey) and an onSessionExpired callback that triggers automatic logout on 401.",
         "exportUtils.ts": "Client-side export generators for CSV, JSON, GPX, KML, Summary CSV, and bulk ZIP",
         "htmlReportBuilder.ts": "A4-width HTML report generator with day grouping and weather data",
         "mapStyles.ts": "Map style definitions for Satellite, Topographic, and OpenStreetMap views",
@@ -189,7 +190,8 @@
           "video_count (INTEGER — detected from telemetry transitions)",
           "imported_at (TIMESTAMPTZ)",
           "notes (VARCHAR)",
-          "color (VARCHAR — hex color code, default '#7dd3fc')"
+          "color (VARCHAR — hex color code, default '#7dd3fc')",
+          "cycle_count (INTEGER — battery charge cycle count from DJI SmartBatteryStatic loop_times)"
         ]
       },
       "telemetry": {
@@ -306,7 +308,8 @@
       "per_profile_isolation": "Each profile has its own DuckDB database, config.json, uploaded/ folder, and sync path (within the data directory).",
       "password_protection": "Optional argon2id-hashed password per profile (including default). Set/change/remove via Settings. Session-based auth in web mode.",
       "master_password": "PROFILE_CREATION_PASS env var gates creation and deletion in web/Docker mode.",
-      "session_management": "Web mode issues 256-bit session tokens (24h TTL) stored in sessionStorage. Each browser tab can be on a different profile.",
+      "session_management": "Web mode issues 256-bit session tokens (24h TTL, configurable via SESSION_TTL_HOURS). Tokens use a hybrid storage strategy: sessionStorage for per-tab isolation, localStorage as a persistent fallback so sessions survive browser restarts. On 401, the token is auto-cleared and the login overlay is shown.",
+      "desktop_locking": "Desktop profiles auto-lock on app close. lock_profile, unlock_profile, and is_app_locked Tauri commands manage the lock state. The InitializationOverlay prompts for re-authentication.",
       "lockout": "5 consecutive failed attempts lock the profile for 60 seconds."
     },
     "flight_visualization": {
@@ -317,7 +320,7 @@
           "Topographic",
           "OpenStreetMap"
         ],
-        "flight_path": "3D Catmull-Rom spline-smoothed path with shadow layer, gradient coloring, and start/end/home markers",
+        "flight_path": "3D Catmull-Rom spline-smoothed path with shadow layer, gradient coloring, and start/end/home markers. Track downsampled to 3000 points before smoothing; segments batched by color similarity (threshold ≤12 per channel, batch size 80) for GPU efficiency.",
         "color_modes": [
           "Start to End (progress)",
           "Height",
@@ -422,10 +425,10 @@
         "Avg Speed"
       ],
       "activity_heatmap": "365-day 7×52 grid showing flight counts per day. Double-click to filter to that date.",
-      "charts": "Donut charts: flights by drone model, battery serial, and duration bucket (Short <10min, Mid 10-20min, Long >20min).",
-      "cluster_map": "MapLibre map with clustered flight locations. Click clusters to zoom. Map area filter toggle with green glow border.",
+      "charts": "Donut charts: flights by drone model, battery serial, and duration bucket (Short <10min, Mid 10-20min, Long >20min). Radial polar chart: flights by time of day (24 segments, local hour estimated from takeoff longitude).",
+      "cluster_map": "MapLibre map with clustered flight locations and optional heatmap layer (toggle). Click clusters to zoom. Map area filter toggle with green glow border.",
       "top_flights": "Top 3 longest (by duration) and top 3 furthest (by distance from home).",
-      "battery_health": "Per-battery health bars, inline rename, per-minute usage history plot (scatter + smoothed line) with zoom slider.",
+      "battery_health": "Per-battery health bars (sorted by health %, lowest first), inline rename, per-minute usage history plot (scatter + smoothed line) with zoom slider. Shows cycle count when available from DJI SmartBatteryStatic data, otherwise falls back to flight count.",
       "maintenance_tracking": "Configurable flight and airtime thresholds for batteries and aircraft. Color-coded progress bars (green <60%, yellow 60-74%, orange 75-89%, red 90%+). Date-based maintenance recording.",
       "filter_sync": "Overview uses sidebar-filtered flight IDs from Zustand store (sidebarFilteredFlightIds) instead of its own filter bar."
     },
@@ -575,7 +578,8 @@
     "SYNC_LOGS_PATH": "Path to internal folder for automatic log import (e.g., /sync-logs)",
     "SYNC_INTERVAL": "Cron expression for scheduled sync (e.g., 0 0 */8 * * *)",
     "KEEP_UPLOADED_FILES": "When true (default), keeps copies of uploaded log files",
-    "PROFILE_CREATION_PASS": "Master password for creating/deleting profiles in web/Docker mode. When unset, profile management is open."
+    "PROFILE_CREATION_PASS": "Master password for creating/deleting profiles in web/Docker mode. When unset, profile management is open.",
+    "SESSION_TTL_HOURS": "Session token lifetime in hours (default: 24). After expiry the user must re-authenticate."
   },
   "ci_cd": {
     "github_desktop_builds": {

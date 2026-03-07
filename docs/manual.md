@@ -97,8 +97,8 @@ The application is divided into three main areas:
 |---------|---------|
 | **Statistics Cards** | Total flights, distance, time, and data points |
 | **Activity Heatmap** | Calendar view of flight activity |
-| **Charts** | Flights by drone, battery, and duration breakdowns |
-| **Cluster Map** | Geographic view of all flight locations |
+| **Charts** | Flights by drone, battery, duration, and time of day |
+| **Cluster Map** | Geographic view of all flight locations with optional heatmap |
 | **Battery Health** | Per-battery health indicators |
 | **Top Flights** | Longest and furthest flights |
 | **Maintenance** | Track maintenance schedules for batteries and aircraft |
@@ -213,7 +213,8 @@ Open DroneLog supports multiple named profiles. Each profile is a fully isolated
 
 - Click the profile selector and choose the desired profile
 - If the profile is password-protected (shown with a lock icon), you'll be prompted to enter the password
-- Each browser tab maintains its own active profile (via `sessionStorage`), so you can have multiple tabs open on different profiles
+- Each browser tab maintains its own active profile (via tab-scoped storage), so you can have multiple tabs open on different profiles
+- Session tokens use a hybrid strategy: `sessionStorage` for per-tab isolation plus `localStorage` as a persistent fallback, so sessions survive browser restarts without conflicting across tabs
 
 ### Deleting a Profile
 
@@ -236,6 +237,8 @@ Any profile (including the default profile) can be protected with a password:
 Password details:
 - Passwords are hashed with **argon2id** (industry-standard)
 - In web/Docker mode, a successful login issues a **session token** (valid for 24 hours by default, configurable via `SESSION_TTL_HOURS` env var)
+- When a session expires or becomes invalid, the app automatically clears the token and shows the login overlay
+- **Desktop auto-lock**: On the desktop app, profiles automatically lock when the app closes and prompt for re-authentication on the next launch
 - **Lockout**: 5 consecutive failed password attempts lock the profile for 60 seconds
 - Protected profiles show an amber **lock icon** in the profile selector dropdown
 
@@ -665,13 +668,14 @@ A calendar-style visualization showing flight activity:
 
 ### Breakdown Charts
 
-Three donut charts showing flight distribution:
+Four charts showing flight distribution:
 
 | Chart | Breakdown |
 |-------|-----------|
 | **Flights by Drone** | Which aircraft you fly most |
 | **Flights by Battery** | Battery usage distribution |
 | **Flights by Duration** | Short (<10min), Mid (10-20min), Long (>20min) |
+| **Flights by Time of Day** | Radial polar chart showing flight counts by hour (local time estimated from takeoff longitude) |
 
 ### Flight Cluster Map
 
@@ -680,6 +684,7 @@ An interactive map showing all flight locations:
 - Clusters group nearby flights
 - Click a cluster to zoom in
 - Click individual markers to select that flight
+- Optional **heatmap layer** — toggle to visualize flight density as a heat overlay
 - Map respects current sidebar filters
 
 ### Top Flights
@@ -699,9 +704,10 @@ Click any entry to load that flight.
 
 ### Battery Health
 
-The Overview shows health indicators for each battery:
+The Overview shows health indicators for each battery, sorted by health percentage (lowest first):
 
 - Health percentage based on voltage characteristics
+- Battery cycle count (from DJI SmartBatteryStatic data when available, otherwise falls back to flight count)
 - Usage statistics (flight count, total time)
 - Inline renaming: click to give batteries friendly names
 

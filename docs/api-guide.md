@@ -193,20 +193,25 @@ All data operations use the active profile. In web/Docker mode, the active profi
 | `get_active_profile` | - | Get active profile name |
 | `set_profile_password` | `profile: String, new_password: String, current_password: Option<String>` | Set/change password |
 | `remove_profile_password` | `profile: String, current_password: String` | Remove password |
+| `lock_profile` | - | Lock the active profile (desktop auto-logout on close) |
+| `unlock_profile` | `password: String` | Unlock a locked profile with the correct password |
+| `is_app_locked` | - | Check if the current profile is locked (returns boolean) |
 
 ### Authentication Flow (Web/Docker)
 
 1. Client sends `X-Profile: <name>` header with every request
 2. If the profile is password-protected, the client must first authenticate via `POST /api/profiles/switch` with the correct `password`
 3. On success, the server returns a session token in `{ session: "<token>" }`
-4. Client stores the token in `sessionStorage` and sends it as `X-Session: <token>` with all subsequent requests
-5. The `ProfileDb` extractor validates the session token and routes the request to the correct profile database
-6. Sessions expire after **24 hours**; a new login is required after expiry
+4. Client stores the token using a hybrid strategy: `sessionStorage` for per-tab isolation, plus `localStorage` as a persistent fallback so sessions survive browser restarts. Each tab reads its own `sessionStorage` first, falling back to `localStorage` for freshly opened tabs.
+5. The token is sent as `X-Session: <token>` with all subsequent requests
+6. The `ProfileDb` extractor validates the session token and routes the request to the correct profile database
+7. Sessions expire after **24 hours** (configurable via `SESSION_TTL_HOURS` env var); a new login is required after expiry
+8. On a **401 response** (expired or invalid token), the client automatically clears the stored token and displays the login overlay
 
 ### Lockout Policy
 
 - **5 consecutive failed** password attempts lock the profile for **60 seconds**
-- During lockout, all authentication attempts are rejected with a `401` status
+- During lockout, all authentication attempts are rejected with a `429 Too Many Requests` status
 
 ### Response Types
 
@@ -340,6 +345,7 @@ interface Flight {
   tags?: FlightTag[];
   color?: string;
   notes?: string;
+  cycleCount?: number;
 }
 ```
 
@@ -367,6 +373,19 @@ interface OverviewStats {
   totalDataPoints: number;
   totalPhotos: number;
   totalVideos: number;
+  batteriesUsed: BatteryUsage[];
+  dronesUsed: DroneUsage[];
+  flightsByDate: FlightDateCount[];
+  topFlights: TopFlight[];
+  topDistanceFlights: TopDistanceFlight[];
+  batteryHealthPoints: BatteryHealthPoint[];
+}
+
+interface BatteryUsage {
+  batterySerial: string;
+  flightCount: number;
+  totalDurationSecs: number;
+  maxCycleCount: number | null; // From DJI SmartBatteryStatic loop_times
 }
 ```
 
