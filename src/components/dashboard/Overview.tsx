@@ -1906,7 +1906,7 @@ function BatteryHealthList({
                       </svg>
                     </button>
                   </span>
-                  <div className="flex-1 min-w-[30px] relative h-2 bg-gray-700/50 rounded-full overflow-hidden mx-1">
+                  <div className="flex-1 min-w-[25px] relative h-2 bg-gray-700/50 rounded-full overflow-hidden mx-1">
                     <div
                       className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
                       style={{
@@ -1918,7 +1918,7 @@ function BatteryHealthList({
                   <span className="w-[28px] md:w-[32px] flex-shrink-0 text-[10px] text-gray-500 text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {healthPercent.toFixed(0)}%
                   </span>
-                  <span className="hidden md:inline-block w-[90px] md:w-[150px] flex-shrink-0 text-gray-400 text-[9px] md:text-[10px] text-right md:text-left truncate">
+                  <span className="hidden md:inline-block w-[110px] md:w-[200px] flex-shrink-0 text-gray-400 text-[9px] md:text-[10px] text-right md:text-left truncate">
                     {cycleCount != null
                       ? t('overview.cycleCountAndFlightsAndDuration', { cycles: cycleCount, flights: battery.flightCount, duration: formatDuration(battery.totalDurationSecs) })
                       : t('overview.flightsAndDuration', { n: battery.flightCount, duration: formatDuration(battery.totalDurationSecs) })}
