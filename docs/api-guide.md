@@ -63,6 +63,7 @@ File exports (CSV, JSON, GPX, KML, HTML Report) are generated entirely on the fr
 |--------|-------------------|-------------|
 | GET | `/api/flight_data?flight_id={id}&max_points={n}` | Get flight details with telemetry data. Returns `FlightDataResponse` containing flight metadata, telemetry arrays, track coordinates, and messages. `max_points` limits downsampling (default ~5000). |
 | GET | `/api/overview` | Get aggregate statistics across all flights. Returns `OverviewStats` with totals for flights, distance, time, and max values. |
+| GET | `/api/battery_capacity_history?battery_serial={serial}` | Get full-charge capacity history for a specific battery. Returns array of `[flight_id, start_time, max_capacity]` tuples across all flights using that battery. |
 
 ### Tauri Commands (Desktop)
 
@@ -70,6 +71,7 @@ File exports (CSV, JSON, GPX, KML, HTML Report) are generated entirely on the fr
 |---------|------------|-------------|
 | `get_flight_data` | `flight_id: i64, max_points: Option<usize>` | Get flight telemetry |
 | `get_overview_stats` | - | Get aggregate statistics |
+| `get_battery_full_capacity_history` | `battery_serial: String` | Get capacity history for a battery |
 
 ### Telemetry Data Structure
 
@@ -96,6 +98,8 @@ The telemetry response includes these arrays (all keyed by index):
 | `distanceToHome` | `f64[]` | Distance from takeoff (meters) |
 | `isPhoto` | `bool[]` | Photo capture state per frame |
 | `isVideo` | `bool[]` | Video recording state per frame |
+| `batteryFullCapacity` | `f64[]` | Battery design/full capacity (mAh) |
+| `batteryRemainedCapacity` | `f64[]` | Remaining usable capacity (mAh) |
 
 ---
 
@@ -346,6 +350,8 @@ interface Flight {
   color?: string;
   notes?: string;
   cycleCount?: number;
+  rcSerial?: string;      // Remote controller serial number
+  batteryLife?: number;   // Battery capacity/life percentage
 }
 ```
 

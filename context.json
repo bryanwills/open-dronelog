@@ -191,7 +191,9 @@
           "imported_at (TIMESTAMPTZ)",
           "notes (VARCHAR)",
           "color (VARCHAR — hex color code, default '#7dd3fc')",
-          "cycle_count (INTEGER — battery charge cycle count from DJI SmartBatteryStatic loop_times)"
+          "cycle_count (INTEGER — battery charge cycle count from DJI SmartBatteryStatic loop_times)",
+          "rc_serial (VARCHAR — remote controller serial number)",
+          "battery_life (INTEGER — battery capacity/life percentage)"
         ]
       },
       "telemetry": {
@@ -231,7 +233,9 @@
           "rc_throttle (FLOAT)",
           "rc_rudder (FLOAT)",
           "is_photo (BOOLEAN)",
-          "is_video (BOOLEAN)"
+          "is_video (BOOLEAN)",
+          "battery_full_capacity (FLOAT — battery design/full charge capacity in mAh)",
+          "battery_remained_capacity (FLOAT — remaining usable battery capacity in mAh)"
         ],
         "notes": [
           "Column order is strictly enforced; mismatches trigger automatic rebuild",
@@ -350,7 +354,9 @@
         "Attitude (Pitch / Roll / Yaw)",
         "RC Signal / Uplink / Downlink",
         "GPS Satellites",
-        "Distance to Home"
+        "Distance to Home",
+        "Battery Full Capacity (mAh)",
+        "Battery Remained Capacity (mAh)"
       ],
       "interactions": [
         "Synchronized zoom across all charts",
@@ -404,7 +410,8 @@
           "Duration range slider",
           "Altitude range slider",
           "Distance range slider",
-          "Map area filter (Overview map bounds)"
+          "Map area filter (Overview map bounds)",
+          "Controller (multi-select — RC serial)"
         ],
         "inversion": "Filter inversion button: individually negates each active filter using AND logic (NOT A AND NOT B).",
         "auto_refresh": "Slider ranges and dropdown options auto-refresh after flight deletion."
@@ -428,7 +435,7 @@
       "charts": "Donut charts: flights by drone model, battery serial, and duration bucket (Short <10min, Mid 10-20min, Long >20min). Radial polar chart: flights by time of day (24 segments, local hour estimated from takeoff longitude).",
       "cluster_map": "MapLibre map with clustered flight locations and optional heatmap layer (toggle). Click clusters to zoom. Map area filter toggle with green glow border.",
       "top_flights": "Top 3 longest (by duration) and top 3 furthest (by distance from home).",
-      "battery_health": "Per-battery health bars (sorted by health %, lowest first), inline rename, per-minute usage history plot (scatter + smoothed line) with zoom slider. Shows cycle count when available from DJI SmartBatteryStatic data, otherwise falls back to flight count.",
+      "battery_health": "Per-battery health bars (sorted by health %, lowest first), inline rename, per-minute usage history plot (scatter + smoothed line) with zoom slider. Shows cycle count when available from DJI SmartBatteryStatic data, otherwise falls back to flight count. Battery Capacity History chart: multi-select dropdown to pick batteries, scatter + smooth-line plot of max full-charge capacity per flight over time (y-axis min 250 mAh, dynamic max), defaults to most recently used battery, selected batteries sorted to top of dropdown, scrollable legend.",
       "maintenance_tracking": "Configurable flight and airtime thresholds for batteries and aircraft. Color-coded progress bars (green <60%, yellow 60-74%, orange 75-89%, red 90%+). Date-based maintenance recording.",
       "filter_sync": "Overview uses sidebar-filtered flight IDs from Zustand store (sidebarFilteredFlightIds) instead of its own filter bar."
     },
@@ -496,6 +503,7 @@
       "GET    /api/flights             — List all flights",
       "GET    /api/flight_data         — Get flight telemetry (query: flight_id, max_points)",
       "GET    /api/overview            — Overview statistics",
+      "GET    /api/battery_capacity_history — Battery full-charge capacity history (query: battery_serial)",
       "DELETE /api/flights/delete      — Delete flight (query: flight_id)",
       "DELETE /api/flights/delete_all  — Delete all flights",
       "POST   /api/flights/deduplicate — Remove duplicate flights",

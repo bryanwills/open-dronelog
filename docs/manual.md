@@ -344,6 +344,12 @@ Click the **Filters** header in the sidebar to expand or collapse the filter sec
 - Batteries use custom names if you have renamed them
 - Selected batteries appear at the top
 
+#### Controller Filter
+
+- Multi-select dropdown showing all remote controller serial numbers
+- Filter flights by which RC was used
+- Selected controllers appear at the top of the list
+
 #### Color Filter
 
 - Dropdown to select customized assigned flight colors
@@ -461,7 +467,9 @@ When a flight is selected, the stats bar shows key metrics:
 |-------|-------------|
 | **Start Time** | When the flight began |
 | **Drone Model** | Aircraft used |
+| **RC Serial** | Remote controller serial number (displayed as a capsule when available) |
 | **Battery** | Battery serial and health indicators |
+| **Battery Capacity** | Battery life / capacity percentage (when available from flight log) |
 | **Home Location** | Takeoff coordinates |
 | **Photos** | Number of photo captures detected |
 | **Videos** | Number of video recordings detected |
@@ -498,6 +506,8 @@ The telemetry panel displays synchronized charts:
 | **RC Uplink/Downlink** | Signal quality metrics |
 | **Distance to Home** | How far from takeoff point |
 | **Velocity X/Y/Z** | Speed components in 3D space |
+| **Battery Full Capacity** | Design capacity reported by the battery (mAh) |
+| **Battery Remained Capacity** | Remaining usable capacity (mAh) |
 
 > [!NOTE]
 > The Cell Voltages chart is only displayed when cell voltage data is available from the flight log. Not all DJI drones record per-cell voltages.
@@ -710,6 +720,18 @@ The Overview shows health indicators for each battery, sorted by health percenta
 - Battery cycle count (from DJI SmartBatteryStatic data when available, otherwise falls back to flight count)
 - Usage statistics (flight count, total time)
 - Inline renaming: click to give batteries friendly names
+
+### Battery Capacity History
+
+Track how each battery's full charge capacity changes over time:
+
+- **Multi-select dropdown** lets you pick one or more batteries to plot
+- Defaults to the most recently used battery (based on latest flight start time)
+- Scatter points show the maximum reported full capacity per flight
+- A smooth connecting line appears when a battery has more than one data point
+- Y-axis starts at 250 mAh for consistent comparison; max adjusts dynamically
+- Selected batteries are sorted to the top of the dropdown for quick access
+- Legend at the bottom lists each selected battery series (scrollable if many)
 
 ### Battery Usage Timeline
 
