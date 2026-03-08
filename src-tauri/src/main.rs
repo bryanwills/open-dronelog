@@ -469,6 +469,8 @@ mod tauri_app {
             aircraft_name: Some(aircraft_name),
             battery_serial: Some(battery_serial.trim().to_uppercase()),
             cycle_count: None,
+            rc_serial: None,
+            battery_life: None,
             start_time: Some(parsed_start_time),
             end_time: Some(end_time),
             duration_secs: Some(duration_secs),
@@ -628,6 +630,17 @@ mod tauri_app {
             stats.total_distance_m
         );
         Ok(stats)
+    }
+
+    #[tauri::command]
+    pub async fn get_battery_full_capacity_history(
+        battery_serial: String,
+        state: State<'_, AppState>,
+    ) -> Result<Vec<(i64, String, f64)>, String> {
+        state
+            .db_authenticated()?
+            .get_battery_full_capacity_history(&battery_serial)
+            .map_err(|e| format!("Failed to get battery capacity history: {}", e))
     }
 
     #[tauri::command]
@@ -1071,6 +1084,8 @@ mod tauri_app {
             aircraft_name: flight.aircraft_name.clone(),
             battery_serial: flight.battery_serial.clone(),
             cycle_count: flight.cycle_count,
+            rc_serial: flight.rc_serial.clone(),
+            battery_life: flight.battery_life,
             start_time: flight.start_time.as_deref()
                 .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                 .map(|dt| dt.with_timezone(&chrono::Utc))
@@ -1141,6 +1156,8 @@ mod tauri_app {
                         aircraft_name: flight.aircraft_name.clone(),
                         battery_serial: flight.battery_serial.clone(),
                         cycle_count: flight.cycle_count,
+                        rc_serial: flight.rc_serial.clone(),
+                        battery_life: flight.battery_life,
                         start_time: flight.start_time.as_deref()
                             .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                             .map(|dt| dt.with_timezone(&chrono::Utc))
@@ -1475,6 +1492,7 @@ mod tauri_app {
                 get_flights,
                 get_flight_data,
                 get_overview_stats,
+                get_battery_full_capacity_history,
                 delete_flight,
                 delete_all_flights,
                 deduplicate_flights,

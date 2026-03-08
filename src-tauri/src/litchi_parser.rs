@@ -326,6 +326,10 @@ impl<'a> LitchiParser<'a> {
             // Camera state
             is_photo: col_map.get_bool(row, "istakingphoto"),
             is_video: col_map.get_bool(row, "isTakingVideo"),
+
+            // Battery capacity (not available in Litchi CSV)
+            battery_full_capacity: None,
+            battery_remained_capacity: None,
         }
     }
 
@@ -416,6 +420,8 @@ impl<'a> LitchiParser<'a> {
                 .map(|s| s.trim().to_uppercase())
                 .filter(|s| !s.is_empty()),
             cycle_count: None,
+            rc_serial: None,
+            battery_life: None,
             start_time,
             end_time,
             duration_secs,

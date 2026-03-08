@@ -73,6 +73,10 @@ const TELEMETRY_FIELDS: TelemetryFieldDef[] = [
 
   // Cell Voltages (virtual field that expands to all available cells)
   { id: 'allCellVoltages', label: 'telemetry.cellVoltages', color: '#fbbf24', dataKey: 'cellVoltages', unit: 'V', group: 'battery' },
+
+  // Battery capacity group
+  { id: 'batteryFullCapacity', label: 'telemetry.fullCapacity', color: '#06b6d4', dataKey: 'batteryFullCapacity', unit: 'mAh', group: 'battery' },
+  { id: 'batteryRemainedCapacity', label: 'telemetry.remainedCapacity', color: '#f43f5e', dataKey: 'batteryRemainedCapacity', unit: 'mAh', group: 'battery' },
 ];
 
 /** Get field definition by id */
@@ -336,6 +340,7 @@ interface TelemetryChartsConfig {
   distanceToHome: ChartPanelConfig;
   velocity: ChartPanelConfig;
   gps: ChartPanelConfig;
+  batteryCapacity: ChartPanelConfig;
 }
 
 /** Default configuration for all charts */
@@ -348,6 +353,7 @@ const DEFAULT_CHART_CONFIGS: TelemetryChartsConfig = {
   distanceToHome: { title: null, selectedFields: ['distanceToHome'] },
   velocity: { title: null, selectedFields: ['velocityX', 'velocityY', 'velocityZ'] },
   gps: { title: null, selectedFields: ['satellites'] },
+  batteryCapacity: { title: null, selectedFields: ['batteryFullCapacity', 'batteryRemainedCapacity'] },
 };
 
 const CHART_CONFIG_STORAGE_KEY = 'telemetryChartConfigs';
@@ -923,6 +929,28 @@ export function TelemetryCharts({ data, unitSystem, startTime }: TelemetryCharts
     [data, splitLineColor, tooltipColors, tooltipFormatter, unitSystem, chartConfigs.gps, t]
   );
 
+  // Battery Capacity chart - only show if data exists
+  const batteryCapacityOption = useMemo(
+    () => {
+      const hasCapData = data.batteryFullCapacity?.some(v => v !== null) || data.batteryRemainedCapacity?.some(v => v !== null);
+      if (!hasCapData) return null;
+      const config = chartConfigs.batteryCapacity;
+      if (config.selectedFields.length > 0) {
+        return createDynamicChart(
+          config.selectedFields,
+          data,
+          unitSystem,
+          splitLineColor,
+          tooltipFormatter,
+          tooltipColors,
+          t
+        );
+      }
+      return null;
+    },
+    [data, splitLineColor, tooltipColors, tooltipFormatter, unitSystem, chartConfigs.batteryCapacity, t]
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex justify-start md:justify-end gap-1.5">
@@ -1021,6 +1049,28 @@ export function TelemetryCharts({ data, unitSystem, startTime }: TelemetryCharts
           <div className={`h-52${mapSyncEnabled ? ' pointer-events-none' : ''}`}>
             <ReactECharts
               option={cellVoltageOption}
+              style={{ height: '100%', width: '100%' }}
+              opts={{ renderer: 'canvas' }}
+              notMerge={true}
+              onChartReady={registerChart}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Battery Capacity Chart - only shown if capacity data exists */}
+      {batteryCapacityOption && (
+        <div>
+          <ChartHeader
+            config={chartConfigs.batteryCapacity}
+            availableFields={TELEMETRY_FIELDS}
+            onFieldsChange={(fields) => updateChartConfig('batteryCapacity', { selectedFields: fields })}
+            unitSystem={unitSystem}
+            theme={resolvedTheme}
+          />
+          <div className={`h-52${mapSyncEnabled ? ' pointer-events-none' : ''}`}>
+            <ReactECharts
+              option={batteryCapacityOption}
               style={{ height: '100%', width: '100%' }}
               opts={{ renderer: 'canvas' }}
               notMerge={true}

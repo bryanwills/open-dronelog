@@ -391,6 +391,8 @@ impl<'a> DroneLogbookParser<'a> {
         let meta_aircraft_name = metadata_map.get("aircraft_name").cloned();
         let meta_battery_serial = metadata_map.get("battery_serial").cloned();
         let meta_cycle_count = metadata_map.get("cycle_count").and_then(|s| s.parse::<i32>().ok());
+        let meta_rc_serial = metadata_map.get("rc_serial").cloned().filter(|s| !s.is_empty());
+        let meta_battery_life = metadata_map.get("battery_life").and_then(|s| s.parse::<i32>().ok());
         let meta_start_time = metadata_map.get("start_time").and_then(|s| {
             parse_timestamp_flexible(s)
         });
@@ -514,6 +516,10 @@ impl<'a> DroneLogbookParser<'a> {
                 // Camera state
                 is_photo: col_map.get_bool(fields, "is_photo"),
                 is_video: col_map.get_bool(fields, "is_video"),
+
+                // Battery capacity
+                battery_full_capacity: col_map.get_f64(fields, "battery_full_capacity_mah"),
+                battery_remained_capacity: col_map.get_f64(fields, "battery_remained_capacity_mah"),
             };
 
             if point.latitude.is_some() && point.longitude.is_some() {
@@ -608,6 +614,10 @@ impl<'a> DroneLogbookParser<'a> {
                 .map(|s| s.trim().to_uppercase())
                 .filter(|s| !s.is_empty()),
             cycle_count: meta_cycle_count,
+            rc_serial: meta_rc_serial
+                .map(|s| s.trim().to_uppercase())
+                .filter(|s| !s.is_empty()),
+            battery_life: meta_battery_life,
             start_time,
             end_time: start_time.map(|st| {
                 st + chrono::Duration::seconds(duration_secs.unwrap_or(0.0) as i64)

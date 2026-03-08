@@ -514,6 +514,10 @@ impl<'a> AirdataParser<'a> {
             // Camera state
             is_photo: col_map.get_bool(row, "isphoto"),
             is_video: col_map.get_bool(row, "isvideo"),
+
+            // Battery capacity (not available in Airdata CSV)
+            battery_full_capacity: None,
+            battery_remained_capacity: None,
         }
     }
 
@@ -599,6 +603,8 @@ impl<'a> AirdataParser<'a> {
             aircraft_name: None,   // not in CSV
             battery_serial: None,  // not in CSV
             cycle_count: None,
+            rc_serial: None,
+            battery_life: None,
             start_time,
             end_time,
             duration_secs,

@@ -9,7 +9,8 @@ import { useTranslation } from 'react-i18next';
 import ReactECharts from 'echarts-for-react';
 import { DayPicker, type DateRange } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
-import type { BatteryHealthPoint, Flight, OverviewStats } from '@/types';
+import type { Flight, OverviewStats } from '@/types';
+import { getBatteryFullCapacityHistory } from '@/lib/api';
 import {
   formatDistance,
   formatDuration,
@@ -224,12 +225,6 @@ export function Overview({ stats, flights, unitSystem, onSelectFlight }: Overvie
     };
   }, [filteredFlights, stats.maxDistanceFromHomeM, stats.topDistanceFlights, getDroneDisplayName, droneNameMap]);
 
-  const filteredHealthPoints = useMemo(() => {
-    if (!stats.batteryHealthPoints.length) return [] as BatteryHealthPoint[];
-    const idSet = new Set(filteredFlights.map((flight) => flight.id));
-    return stats.batteryHealthPoints.filter((point) => idSet.has(point.flightId));
-  }, [filteredFlights, stats.batteryHealthPoints]);
-
   const filteredTopDistanceFlights = useMemo(() => {
     if (!stats.topDistanceFlights?.length) return [] as typeof stats.topDistanceFlights;
     const idSet = new Set(filteredFlights.map((flight) => flight.id));
@@ -378,7 +373,7 @@ export function Overview({ stats, flights, unitSystem, onSelectFlight }: Overvie
           <h3 className="text-sm font-semibold text-white mb-3">{t('overview.batteryHealth')}</h3>
           <BatteryHealthList
             batteries={filteredStats.batteriesUsed}
-            points={filteredHealthPoints}
+            filteredFlights={filteredFlights}
             isLight={resolvedTheme === 'light'}
             getBatteryDisplayName={getBatteryDisplayName}
             renameBattery={renameBattery}
@@ -1503,14 +1498,14 @@ function FlightTimeRadialChart({
 
 function BatteryHealthList({
   batteries,
-  points,
+  filteredFlights,
   isLight,
   getBatteryDisplayName,
   renameBattery,
   hideSerialNumbers,
 }: {
   batteries: { batterySerial: string; flightCount: number; totalDurationSecs: number; maxCycleCount: number | null }[];
-  points: BatteryHealthPoint[];
+  filteredFlights: Flight[];
   isLight: boolean;
   getBatteryDisplayName: (serial: string) => string;
   renameBattery: (serial: string, displayName: string) => void;
@@ -1521,6 +1516,159 @@ function BatteryHealthList({
   const [editingSerial, setEditingSerial] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
+
+  // Battery selection for capacity chart
+  const [selectedCapBatteries, setSelectedCapBatteries] = useState<string[]>([]);
+  const [capBatteryDropdownOpen, setCapBatteryDropdownOpen] = useState(false);
+  const [capBatterySearch, setCapBatterySearch] = useState('');
+  const capBatteryDropdownRef = useRef<HTMLDivElement>(null);
+  const [defaultCapBatteryInitialized, setDefaultCapBatteryInitialized] = useState(false);
+
+  // Determine the most recently used battery serial
+  const mostRecentBatterySerial = useMemo(() => {
+    let latest: string | null = null;
+    let latestTime = -Infinity;
+    for (const f of filteredFlights) {
+      const serial = normalizeSerial(f.batterySerial);
+      if (serial && f.startTime) {
+        const t = Date.parse(f.startTime);
+        if (Number.isFinite(t) && t > latestTime) {
+          latestTime = t;
+          latest = serial;
+        }
+      }
+    }
+    return latest;
+  }, [filteredFlights]);
+
+  // Fetch battery full capacity history for all batteries
+  const [capacityHistory, setCapacityHistory] = useState<Map<string, [number, string, number][]>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAll = async () => {
+      const result = new Map<string, [number, string, number][]>();
+      for (const bat of batteries) {
+        try {
+          const history = await getBatteryFullCapacityHistory(bat.batterySerial);
+          if (!cancelled && history.length > 0) {
+            result.set(bat.batterySerial, history);
+          }
+        } catch {
+          // ignore failures for individual batteries
+        }
+      }
+      if (!cancelled) {
+        setCapacityHistory(result);
+        // Initialize default selection to most recently used battery once data is available
+        if (!defaultCapBatteryInitialized && mostRecentBatterySerial && result.has(mostRecentBatterySerial)) {
+          setSelectedCapBatteries([mostRecentBatterySerial]);
+          setDefaultCapBatteryInitialized(true);
+        } else if (!defaultCapBatteryInitialized && result.size > 0) {
+          // Fallback: pick the first battery with data
+          const firstSerial = Array.from(result.keys())[0];
+          setSelectedCapBatteries([firstSerial]);
+          setDefaultCapBatteryInitialized(true);
+        }
+      }
+    };
+    if (batteries.length > 0) {
+      fetchAll();
+    } else {
+      setCapacityHistory(new Map());
+    }
+    return () => { cancelled = true; };
+  }, [batteries, mostRecentBatterySerial, defaultCapBatteryInitialized]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (capBatteryDropdownRef.current && !capBatteryDropdownRef.current.contains(e.target as Node)) {
+        setCapBatteryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Batteries that have capacity data (for the dropdown)
+  const batteriesWithCapData = useMemo(() => {
+    return batteries.filter((b) => capacityHistory.has(b.batterySerial));
+  }, [batteries, capacityHistory]);
+
+  const filteredCapBatteryOptions = useMemo(() => {
+    let list = batteriesWithCapData;
+    if (capBatterySearch.trim()) {
+      const q = capBatterySearch.toLowerCase();
+      list = list.filter((b) => {
+        const name = getBatteryDisplayName(b.batterySerial).toLowerCase();
+        return name.includes(q) || b.batterySerial.toLowerCase().includes(q);
+      });
+    }
+    // Sort selected batteries to the top
+    return [...list].sort((a, b) => {
+      const aSelected = selectedCapBatteries.includes(a.batterySerial);
+      const bSelected = selectedCapBatteries.includes(b.batterySerial);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      return 0;
+    });
+  }, [batteriesWithCapData, capBatterySearch, getBatteryDisplayName, selectedCapBatteries]);
+
+  const toggleCapBattery = (serial: string) => {
+    setSelectedCapBatteries((prev) =>
+      prev.includes(serial) ? prev.filter((s) => s !== serial) : [...prev, serial],
+    );
+  };
+
+  const capacitySeries = useMemo(() => {
+    if (selectedCapBatteries.length === 0) return [];
+    return selectedCapBatteries
+      .filter((serial) => capacityHistory.has(serial))
+      .flatMap((serial) => {
+        const items = capacityHistory.get(serial)!;
+        const data = items
+          .map(([, startTime, maxCap]) => {
+            const time = Date.parse(startTime);
+            if (!Number.isFinite(time)) return null;
+            return [time, Math.round(maxCap)] as [number, number];
+          })
+          .filter((p): p is [number, number] => p !== null);
+
+        const displayName = getBatteryDisplayName(serial);
+        const series: Array<{
+          name: string;
+          type: 'line' | 'scatter';
+          smooth?: boolean;
+          showSymbol?: boolean;
+          symbolSize?: number;
+          connectNulls?: boolean;
+          data: [number, number][];
+        }> = [];
+
+        // Add line series only when there are at least 2 points
+        if (data.length > 1) {
+          series.push({
+            name: displayName,
+            type: 'line',
+            smooth: true,
+            showSymbol: false,
+            connectNulls: true,
+            data,
+          });
+        }
+
+        // Always add scatter series
+        series.push({
+          name: displayName,
+          type: 'scatter',
+          symbolSize: 7,
+          data,
+        });
+
+        return series;
+      });
+  }, [capacityHistory, getBatteryDisplayName, selectedCapBatteries]);
 
   if (batteries.length === 0) {
     return <p className="text-sm text-gray-400">{t('overview.noBatteryDataAvailable')}</p>;
@@ -1569,53 +1717,8 @@ function BatteryHealthList({
     setRenameError(null);
   };
 
-  const seriesMap = new Map<string, BatteryHealthPoint[]>();
-  points.forEach((point) => {
-    const list = seriesMap.get(point.batterySerial) ?? [];
-    list.push(point);
-    seriesMap.set(point.batterySerial, list);
-  });
-
-  const series = Array.from(seriesMap.entries()).flatMap(([serial, items]) => {
-    const sorted = [...items].sort((a, b) => {
-      const aTime = a.startTime ? Date.parse(a.startTime) : 0;
-      const bTime = b.startTime ? Date.parse(b.startTime) : 0;
-      return aTime - bTime;
-    });
-
-    const limited = sorted.length > 20 ? sorted.slice(-20) : sorted;
-    const data = limited
-      .map((p) => {
-        const time = p.startTime ? Date.parse(p.startTime) : NaN;
-        if (!Number.isFinite(time)) return null;
-        return [time, Number(p.ratePerMin.toFixed(3))] as [number, number];
-      })
-      .filter((p): p is [number, number] => p !== null);
-
-    const displayName = getBatteryDisplayName(serial);
-
-    return [
-      {
-        name: displayName,
-        type: 'line' as const,
-        smooth: true,
-        showSymbol: true,
-        symbolSize: 6,
-        connectNulls: true,
-        data,
-      },
-      {
-        name: displayName,
-        type: 'scatter' as const,
-        symbolSize: 7,
-        data,
-      },
-    ];
-  });
-
-  const allY = series.flatMap((s) => s.data.map((p: [number, number]) => p[1]));
-  const yMin = allY.length ? Math.min(...allY) : 0;
-  const yMax = allY.length ? Math.max(...allY) : 1;
+  const allCapY = capacitySeries.flatMap((s) => s.data.map((p: [number, number]) => p[1]));
+  const capYMax = allCapY.length ? Math.max(...allCapY) : 5000;
 
   const titleColor = isLight ? '#0f172a' : '#e5e7eb';
   const axisLineColor = isLight ? '#cbd5f5' : '#374151';
@@ -1627,7 +1730,7 @@ function BatteryHealthList({
 
   const chartOption = {
     title: {
-      text: t('overview.batteryUsageHistory'),
+      text: t('overview.batteryCapacityHistory'),
       left: 'center',
       textStyle: { color: titleColor, fontSize: 12, fontWeight: 'normal' as const },
     },
@@ -1660,8 +1763,15 @@ function BatteryHealthList({
         const dateLabel = params[0].value?.[0]
           ? new Date(params[0].value[0]).toLocaleDateString(dateLocale)
           : t('overview.unknownDate');
+        // Deduplicate entries (line + scatter share the same name)
+        const seen = new Set<string>();
         const lines = params
-          .map((item) => `${item.seriesName}: ${item.value[1]} ${t('overview.percentPerMin')}`)
+          .filter((item) => {
+            if (seen.has(item.seriesName)) return false;
+            seen.add(item.seriesName);
+            return true;
+          })
+          .map((item) => `${item.seriesName}: ${item.value[1]} mAh`)
           .join('<br/>');
         return `<strong>${dateLabel}</strong><br/>${lines}`;
       },
@@ -1669,6 +1779,7 @@ function BatteryHealthList({
     legend: {
       type: 'scroll' as const,
       bottom: 0,
+      data: [...new Set(capacitySeries.map((s) => s.name))],
       textStyle: { color: axisLabelColor, fontSize: 11 },
     },
     grid: { left: 16, right: 16, top: 46, bottom: 72, containLabel: true },
@@ -1680,9 +1791,9 @@ function BatteryHealthList({
     },
     yAxis: {
       type: 'value' as const,
-      min: yMin,
-      max: yMax,
-      name: '% per min',
+      min: 250,
+      max: capYMax,
+      name: 'mAh',
       nameTextStyle: { color: axisLabelColor, fontSize: 10 },
       axisLine: { lineStyle: { color: axisLineColor } },
       axisLabel: { color: axisLabelColor, fontSize: 10 },
@@ -1723,7 +1834,7 @@ function BatteryHealthList({
         },
       },
     ],
-    series,
+    series: capacitySeries,
   };
 
   return (
@@ -1819,14 +1930,114 @@ function BatteryHealthList({
         })}
       </div>
 
-      {series.length > 0 ? (
+      {/* Battery selector for capacity chart */}
+      {batteriesWithCapData.length > 0 && (
+        <div className="relative" ref={capBatteryDropdownRef}>
+          <button
+            onClick={() => setCapBatteryDropdownOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors"
+            style={{
+              borderColor: isLight ? '#cbd5e1' : '#374151',
+              background: isLight ? '#f8fafc' : '#1e293b',
+              color: selectedCapBatteries.length > 0 ? (isLight ? '#0f172a' : '#e5e7eb') : (isLight ? '#94a3b8' : '#6b7280'),
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="16" height="10" rx="2" />
+              <line x1="22" y1="11" x2="22" y2="13" />
+            </svg>
+            <span className="truncate max-w-[200px]">
+              {selectedCapBatteries.length > 0
+                ? selectedCapBatteries.map((s) => getBatteryDisplayName(s)).join(', ')
+                : t('overview.selectBatteries')}
+            </span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {capBatteryDropdownOpen && (
+            <div
+              className="absolute z-50 mt-1 w-56 rounded-lg shadow-lg border overflow-hidden"
+              style={{
+                borderColor: isLight ? '#e2e8f0' : '#374151',
+                background: isLight ? '#ffffff' : '#1e293b',
+              }}
+            >
+              <div className="p-1.5">
+                <input
+                  type="text"
+                  value={capBatterySearch}
+                  onChange={(e) => setCapBatterySearch(e.target.value)}
+                  placeholder={t('overview.searchBatteries')}
+                  className="w-full px-2 py-1 text-xs rounded border outline-none"
+                  style={{
+                    borderColor: isLight ? '#e2e8f0' : '#374151',
+                    background: isLight ? '#f8fafc' : '#0f172a',
+                    color: isLight ? '#0f172a' : '#e5e7eb',
+                  }}
+                  autoFocus
+                />
+              </div>
+              <div className="max-h-[160px] overflow-y-auto">
+                {filteredCapBatteryOptions.length === 0 ? (
+                  <p className="text-xs text-gray-500 px-3 py-2">{t('flightList.noMatchingBatteries')}</p>
+                ) : (
+                  filteredCapBatteryOptions.map((b) => {
+                    const checked = selectedCapBatteries.includes(b.batterySerial);
+                    return (
+                      <button
+                        key={b.batterySerial}
+                        onClick={() => toggleCapBattery(b.batterySerial)}
+                        className="flex items-center gap-2 w-full text-left px-3 py-1.5 text-xs transition-colors"
+                        style={{
+                          color: isLight ? '#0f172a' : '#e5e7eb',
+                          background: checked
+                            ? (isLight ? '#eff6ff' : 'rgba(0, 160, 220, 0.1)')
+                            : 'transparent',
+                        }}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0"
+                          style={{
+                            borderColor: checked ? '#00a0dc' : (isLight ? '#cbd5e1' : '#4b5563'),
+                            background: checked ? '#00a0dc' : 'transparent',
+                          }}
+                        >
+                          {checked && (
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </span>
+                        <span className="truncate">{getBatteryDisplayName(b.batterySerial)}</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {selectedCapBatteries.length > 0 && (
+                <div className="border-t px-2 py-1.5" style={{ borderColor: isLight ? '#e2e8f0' : '#374151' }}>
+                  <button
+                    onClick={() => setSelectedCapBatteries([])}
+                    className="text-[10px] text-sky-500 hover:text-sky-400"
+                  >
+                    {t('overview.clearBatterySelection')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {capacitySeries.length > 0 ? (
         <div className="h-[260px]">
-          <ReactECharts option={chartOption} style={{ height: '100%' }} onChartReady={(chart) => {
+          <ReactECharts option={chartOption} notMerge={true} style={{ height: '100%' }} onChartReady={(chart) => {
             chart.dispatchAction({ type: 'takeGlobalCursor', key: 'dataZoomSelect', dataZoomSelectActive: true });
           }} />
         </div>
       ) : (
-        <p className="text-xs text-gray-500">{t('overview.noBatteryUsagePoints')}</p>
+        <p className="text-xs text-gray-500">{t('overview.noCapacityData')}</p>
       )}
     </div>
   );

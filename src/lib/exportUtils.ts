@@ -90,6 +90,8 @@ export function buildCsv(data: FlightDataResponse): string {
     aircraft_name: flight.aircraftName,
     battery_serial: flight.batterySerial,
     cycle_count: flight.cycleCount,
+    rc_serial: flight.rcSerial ?? null,
+    battery_life: flight.batteryLife ?? null,
     start_time: flight.startTime,
     duration_secs: flight.durationSecs,
     total_distance_m: flight.totalDistance,
@@ -148,6 +150,8 @@ export function buildCsv(data: FlightDataResponse): string {
     'is_photo',
     'is_video',
     'flight_mode',
+    'battery_full_capacity_mah',
+    'battery_remained_capacity_mah',
     'messages',
     'metadata',
   ];
@@ -171,6 +175,7 @@ export function buildCsv(data: FlightDataResponse): string {
       '', '', '', // pitch, roll, yaw
       '', '', '', '', // rc controls
       '', '', '', // is_photo, is_video, flight_mode
+      '', '', // battery_full_capacity_mah, battery_remained_capacity_mah
       escapeCsv(messagesJson),
       escapeCsv(metadataJson),
     ].join(',');
@@ -267,6 +272,8 @@ export function buildCsv(data: FlightDataResponse): string {
       getBoolValue(telemetry.isPhoto, index),
       getBoolValue(telemetry.isVideo, index),
       getStrValue(telemetry.flightMode, index),
+      getMetric(telemetry.batteryFullCapacity, index, 0), // battery_full_capacity_mah
+      getMetric(telemetry.batteryRemainedCapacity, index, 0), // battery_remained_capacity_mah
       // Messages and Metadata JSON only on first row (time 0)
       index === 0 ? messagesJson : '',
       index === 0 ? metadataJson : '',

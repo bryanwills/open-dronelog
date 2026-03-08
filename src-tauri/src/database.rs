@@ -379,6 +379,8 @@ impl Database {
             ("video_count", "ALTER TABLE flights ADD COLUMN video_count INTEGER"),
             ("color", "ALTER TABLE flights ADD COLUMN color VARCHAR DEFAULT '#7dd3fc'"),
             ("cycle_count", "ALTER TABLE flights ADD COLUMN cycle_count INTEGER"),
+            ("rc_serial", "ALTER TABLE flights ADD COLUMN rc_serial VARCHAR"),
+            ("battery_life", "ALTER TABLE flights ADD COLUMN battery_life INTEGER"),
         ];
 
         let need_backfill = !columns.contains("photo_count");
@@ -434,6 +436,8 @@ impl Database {
             ("is_photo", "ALTER TABLE telemetry ADD COLUMN is_photo BOOLEAN"),
             ("is_video", "ALTER TABLE telemetry ADD COLUMN is_video BOOLEAN"),
             ("cell_voltages", "ALTER TABLE telemetry ADD COLUMN cell_voltages VARCHAR"),
+            ("battery_full_capacity", "ALTER TABLE telemetry ADD COLUMN battery_full_capacity FLOAT"),
+            ("battery_remained_capacity", "ALTER TABLE telemetry ADD COLUMN battery_remained_capacity FLOAT"),
         ];
 
         for (col_name, sql) in migrations {
@@ -643,6 +647,8 @@ impl Database {
                 rc_rudder       FLOAT,
                 is_photo        BOOLEAN,
                 is_video        BOOLEAN,
+                battery_full_capacity FLOAT,
+                battery_remained_capacity FLOAT,
                 PRIMARY KEY (flight_id, timestamp_ms)
             );
             
@@ -682,7 +688,9 @@ impl Database {
                 CAST(rc_throttle AS FLOAT),
                 CAST(rc_rudder AS FLOAT),
                 is_photo,
-                is_video
+                is_video,
+                CAST(battery_full_capacity AS FLOAT),
+                CAST(battery_remained_capacity AS FLOAT)
             FROM telemetry;
             
             DROP TABLE telemetry;
@@ -757,6 +765,8 @@ impl Database {
             "rc_rudder",
             "is_photo",
             "is_video",
+            "battery_full_capacity",
+            "battery_remained_capacity",
         ];
 
         let mut stmt = conn.prepare("PRAGMA table_info('telemetry')")?;
@@ -826,7 +836,9 @@ impl Database {
                 rc_throttle     FLOAT,
                 rc_rudder       FLOAT,
                 is_photo        BOOLEAN,
-                is_video        BOOLEAN
+                is_video        BOOLEAN,
+                battery_full_capacity FLOAT,
+                battery_remained_capacity FLOAT
             );
             
             INSERT INTO telemetry_reordered SELECT {} FROM telemetry;
@@ -866,8 +878,8 @@ impl Database {
                 aircraft_name, battery_serial, cycle_count,
                 start_time, end_time, duration_secs, total_distance,
                 max_altitude, max_speed, home_lat, home_lon, point_count,
-                photo_count, video_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                photo_count, video_count, rc_serial, battery_life
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             params![
                 flight.id,
@@ -890,6 +902,8 @@ impl Database {
                 flight.point_count,
                 flight.photo_count,
                 flight.video_count,
+                flight.rc_serial,
+                flight.battery_life,
             ],
         )?;
 
@@ -954,6 +968,8 @@ impl Database {
                 point.rc_rudder,
                 point.is_photo,
                 point.is_video,
+                point.battery_full_capacity,
+                point.battery_remained_capacity,
             ]) {
                 Ok(()) => inserted += 1,
                 Err(err) => {
@@ -996,7 +1012,7 @@ impl Database {
                 duration_secs, total_distance,
                 max_altitude, max_speed, home_lat, home_lon, point_count,
                 photo_count, video_count, notes, COALESCE(color, '#7dd3fc') AS color,
-                cycle_count
+                cycle_count, rc_serial, battery_life
             FROM flights
             ORDER BY start_time DESC
             "#,
@@ -1027,6 +1043,8 @@ impl Database {
                     tags: Vec::new(),
                     notes: row.get(18)?,
                     color: row.get(19)?,
+                    rc_serial: row.get(21)?,
+                    battery_life: row.get(22)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -1075,7 +1093,7 @@ impl Database {
                 duration_secs, total_distance,
                 max_altitude, max_speed, home_lat, home_lon, point_count,
                 photo_count, video_count, notes, COALESCE(color, '#7dd3fc') AS color,
-                cycle_count
+                cycle_count, rc_serial, battery_life
             FROM flights
             WHERE id = ?
             "#,
@@ -1104,6 +1122,8 @@ impl Database {
                     tags: Vec::new(),
                     notes: row.get(18)?,
                     color: row.get(19)?,
+                    rc_serial: row.get(21)?,
+                    battery_life: row.get(22)?,
                 })
             },
         )
@@ -1231,7 +1251,9 @@ impl Database {
                 rc_throttle,
                 rc_rudder,
                 is_photo,
-                is_video
+                is_video,
+                battery_full_capacity,
+                battery_remained_capacity
             FROM telemetry
             WHERE flight_id = ?
             ORDER BY timestamp_ms ASC
@@ -1275,6 +1297,9 @@ impl Database {
                     rc_rudder: row.get(25)?,
                     is_photo: row.get(26)?,
                     is_video: row.get(27)?,
+                    battery_current: None,
+                    battery_full_capacity: row.get(28)?,
+                    battery_remained_capacity: row.get(29)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -1332,7 +1357,9 @@ impl Database {
                     AVG(rc_throttle) AS rc_throttle,
                     AVG(rc_rudder) AS rc_rudder,
                     BOOL_OR(is_photo) AS is_photo,
-                    BOOL_OR(is_video) AS is_video
+                    BOOL_OR(is_video) AS is_video,
+                    AVG(battery_full_capacity) AS battery_full_capacity,
+                    AVG(battery_remained_capacity) AS battery_remained_capacity
                 FROM telemetry
                 WHERE flight_id = ?
                 GROUP BY bucket_ts
@@ -1379,6 +1406,9 @@ impl Database {
                     rc_rudder: row.get(25)?,
                     is_photo: row.get(26)?,
                     is_video: row.get(27)?,
+                    battery_current: None,
+                    battery_full_capacity: row.get(28)?,
+                    battery_remained_capacity: row.get(29)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -1423,6 +1453,33 @@ impl Database {
 
         log::info!("Deleted all flights and telemetry in {:.1}ms", start.elapsed().as_secs_f64() * 1000.0);
         Ok(())
+    }
+
+    /// Get battery full capacity history across flights for a given battery serial
+    /// Returns (flight_id, start_time, max_full_capacity) tuples
+    pub fn get_battery_full_capacity_history(
+        &self,
+        battery_serial: &str,
+    ) -> Result<Vec<(i64, String, f64)>, DatabaseError> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT f.id, CAST(f.start_time AS VARCHAR), MAX(t.battery_full_capacity)
+            FROM flights f
+            JOIN telemetry t ON t.flight_id = f.id
+            WHERE f.battery_serial = ?
+              AND t.battery_full_capacity IS NOT NULL
+              AND t.battery_full_capacity > 0
+            GROUP BY f.id, f.start_time
+            ORDER BY f.start_time ASC
+            "#,
+        )?;
+        let rows = stmt
+            .query_map(params![battery_serial], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     /// Get overview stats across all flights

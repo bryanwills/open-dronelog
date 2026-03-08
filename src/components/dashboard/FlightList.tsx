@@ -176,6 +176,7 @@ export function FlightList({
   } | null>(null);
   const [selectedDrones, setSelectedDrones] = useState<string[]>([]);
   const [selectedBatteries, setSelectedBatteries] = useState<string[]>([]);
+  const [selectedControllers, setSelectedControllers] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // For keyboard navigation: preview ID for visual highlighting before Enter confirms selection
@@ -184,9 +185,11 @@ export function FlightList({
   const [isTagDropdownOpen, setIsTagDropdownOpen] = useState(false);
   const [isDroneDropdownOpen, setIsDroneDropdownOpen] = useState(false);
   const [isBatteryDropdownOpen, setIsBatteryDropdownOpen] = useState(false);
+  const [isControllerDropdownOpen, setIsControllerDropdownOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
   const [droneSearch, setDroneSearch] = useState('');
   const [batterySearch, setBatterySearch] = useState('');
+  const [controllerSearch, setControllerSearch] = useState('');
   const [durationFilterMin, setDurationFilterMin] = useState<number | null>(null);
   const [durationFilterMax, setDurationFilterMax] = useState<number | null>(null);
   const [altitudeFilterMin, setAltitudeFilterMin] = useState<number | null>(null);
@@ -222,6 +225,7 @@ export function FlightList({
   const [tagHighlightedIndex, setTagHighlightedIndex] = useState(0);
   const [droneHighlightedIndex, setDroneHighlightedIndex] = useState(0);
   const [batteryHighlightedIndex, setBatteryHighlightedIndex] = useState(0);
+  const [controllerHighlightedIndex, setControllerHighlightedIndex] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState({ done: 0, total: 0, currentFile: '' });
   const [isDeleting, setIsDeleting] = useState(false);
@@ -261,8 +265,10 @@ export function FlightList({
   const tagDropdownRef = useRef<HTMLDivElement | null>(null);
   const droneDropdownRef = useRef<HTMLDivElement | null>(null);
   const batteryDropdownRef = useRef<HTMLDivElement | null>(null);
+  const controllerDropdownRef = useRef<HTMLDivElement | null>(null);
   const droneBtnRef = useRef<HTMLButtonElement | null>(null);
   const batteryBtnRef = useRef<HTMLButtonElement | null>(null);
+  const controllerBtnRef = useRef<HTMLButtonElement | null>(null);
   const tagBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const dateFormatter = useMemo(
@@ -401,7 +407,7 @@ export function FlightList({
   // --- Cross-filter helper: apply all filters EXCEPT the excluded dimension ---
   // This lets each filter's available options reflect the other active filters.
   const crossFiltered = useMemo(() => {
-    type Dimension = 'drone' | 'battery' | 'duration' | 'altitude' | 'distance' | 'date' | 'tags' | 'color';
+    type Dimension = 'drone' | 'battery' | 'controller' | 'duration' | 'altitude' | 'distance' | 'date' | 'tags' | 'color';
 
     const applyFilters = (exclude: Dimension) => {
       const start = dateRange?.from ?? null;
@@ -425,6 +431,10 @@ export function FlightList({
         // Battery filter
         if (exclude !== 'battery' && selectedBatteries.length > 0) {
           if (!flight.batterySerial || !selectedBatteries.includes(normalizeSerial(flight.batterySerial))) return false;
+        }
+        // Controller filter
+        if (exclude !== 'controller' && selectedControllers.length > 0) {
+          if (!flight.rcSerial || !selectedControllers.includes(flight.rcSerial)) return false;
         }
         // Duration filter
         if (exclude !== 'duration' && (durationFilterMin !== null || durationFilterMax !== null)) {
@@ -467,6 +477,7 @@ export function FlightList({
     return {
       forDrone: applyFilters('drone'),
       forBattery: applyFilters('battery'),
+      forController: applyFilters('controller'),
       forDuration: applyFilters('duration'),
       forAltitude: applyFilters('altitude'),
       forDistance: applyFilters('distance'),
@@ -474,7 +485,7 @@ export function FlightList({
       forTags: applyFilters('tags'),
       forColor: applyFilters('color'),
     };
-  }, [flights, dateRange, selectedDrones, selectedBatteries, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, mapAreaFilterEnabled, mapVisibleBounds]);
+  }, [flights, dateRange, selectedDrones, selectedBatteries, selectedControllers, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, mapAreaFilterEnabled, mapVisibleBounds]);
 
   const droneOptions = useMemo(() => {
     const entries = crossFiltered.forDrone
@@ -511,6 +522,16 @@ export function FlightList({
     return Array.from(unique);
   }, [flights]);
 
+  const controllerOptions = useMemo(() => {
+    const unique = new Set<string>();
+    flights.forEach((flight) => {
+      if (flight.rcSerial) {
+        unique.add(flight.rcSerial);
+      }
+    });
+    return Array.from(unique);
+  }, [flights]);
+
   // Cross-filtered availability sets: which options are reachable given other active filters
   const availableDroneKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -528,6 +549,14 @@ export function FlightList({
     });
     return serials;
   }, [crossFiltered.forBattery]);
+
+  const availableControllerSerials = useMemo(() => {
+    const serials = new Set<string>();
+    crossFiltered.forController.forEach((f) => {
+      if (f.rcSerial) serials.add(f.rcSerial);
+    });
+    return serials;
+  }, [crossFiltered.forController]);
 
   const availableTagNames = useMemo(() => {
     const tags = new Set<string>();
@@ -595,6 +624,23 @@ export function FlightList({
       return a.label.localeCompare(b.label);
     });
   }, [batteryOptions, batterySearch, selectedBatteries, getBatteryDisplayName, availableBatterySerials]);
+
+  // Helper: filtered & sorted controller list for multi-select dropdown
+  const getControllerSorted = useCallback(() => {
+    const all = controllerOptions.map((serial) => ({ value: serial, label: serial }));
+    const filtered = all.filter((c) => c.label.toLowerCase().includes(controllerSearch.toLowerCase()));
+    return [...filtered].sort((a, b) => {
+      const aSelected = selectedControllers.includes(a.value);
+      const bSelected = selectedControllers.includes(b.value);
+      const aAvail = availableControllerSerials.has(a.value);
+      const bAvail = availableControllerSerials.has(b.value);
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      if (aAvail && !bAvail) return -1;
+      if (!aAvail && bAvail) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [controllerOptions, controllerSearch, selectedControllers, availableControllerSerials]);
 
   const durationRange = useMemo(() => {
     const durations = crossFiltered.forDuration
@@ -670,6 +716,14 @@ export function FlightList({
   }, [batteryOptions]);
 
   useEffect(() => {
+    const validControllers = new Set(controllerOptions);
+    setSelectedControllers((prev) => {
+      const pruned = prev.filter((s) => validControllers.has(s));
+      return pruned.length !== prev.length ? pruned : prev;
+    });
+  }, [controllerOptions]);
+
+  useEffect(() => {
     const validTags = new Set(allTags);
     setSelectedTags((prev) => {
       const pruned = prev.filter((t) => validTags.has(t));
@@ -704,7 +758,7 @@ export function FlightList({
     if (end) end.setHours(23, 59, 59, 999);
     const normalizedSearch = searchQuery.trim().toLowerCase();
 
-    const hasAnyFilter = !!(start || end || selectedDrones.length > 0 || selectedBatteries.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || (mapAreaFilterEnabled && mapVisibleBounds) || normalizedSearch);
+    const hasAnyFilter = !!(start || end || selectedDrones.length > 0 || selectedBatteries.length > 0 || selectedControllers.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || (mapAreaFilterEnabled && mapVisibleBounds) || normalizedSearch);
 
     return flights.filter((flight) => {
       // When no filters are active, show all
@@ -737,6 +791,11 @@ export function FlightList({
       if (selectedBatteries.length > 0) {
         const matchesBattery = flight.batterySerial ? selectedBatteries.includes(normalizeSerial(flight.batterySerial)) : false;
         if (isFilterInverted ? matchesBattery : !matchesBattery) return false;
+      }
+
+      if (selectedControllers.length > 0) {
+        const matchesController = flight.rcSerial ? selectedControllers.includes(flight.rcSerial) : false;
+        if (isFilterInverted ? matchesController : !matchesController) return false;
       }
 
       if (durationFilterMin !== null || durationFilterMax !== null) {
@@ -794,7 +853,7 @@ export function FlightList({
 
       return true;
     });
-  }, [dateRange, flights, selectedBatteries, selectedDrones, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, isFilterInverted, mapAreaFilterEnabled, mapVisibleBounds, searchQuery]);
+  }, [dateRange, flights, selectedBatteries, selectedControllers, selectedDrones, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, isFilterInverted, mapAreaFilterEnabled, mapVisibleBounds, searchQuery]);
 
   // Sync filtered flight IDs to the store so Overview can use them
   // Use useLayoutEffect to ensure sync happens synchronously before browser paint
@@ -1621,12 +1680,12 @@ export function FlightList({
           className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-400 hover:text-white transition-colors"
         >
           <span className="flex items-center gap-1.5">
-            <span className={`font-medium ${(dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || mapAreaFilterEnabled || searchQuery.trim()) ? (isFilterInverted ? 'text-red-400' : 'text-emerald-400') : ''}`}>
-              {dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || mapAreaFilterEnabled || searchQuery.trim()
+            <span className={`font-medium ${(dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || selectedControllers.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || mapAreaFilterEnabled || searchQuery.trim()) ? (isFilterInverted ? 'text-red-400' : 'text-emerald-400') : ''}`}>
+              {dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || selectedControllers.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || mapAreaFilterEnabled || searchQuery.trim()
                 ? isFilterInverted ? t('flightList.filtersActiveInverted') : t('flightList.filtersActive')
                 : isFiltersCollapsed ? t('flightList.filtersExpand') : t('flightList.filters')}
             </span>
-            {(dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || mapAreaFilterEnabled || searchQuery.trim()) && (
+            {(dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || selectedControllers.length > 0 || durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || selectedTags.length > 0 || selectedColors.length > 0 || mapAreaFilterEnabled || searchQuery.trim()) && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -1684,7 +1743,7 @@ export function FlightList({
 
             {/* Scrollable filter fields container */}
             {(() => {
-              const hasScrollboxFilter = durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || selectedTags.length > 0 || selectedColors.length > 0;
+              const hasScrollboxFilter = durationFilterMin !== null || durationFilterMax !== null || altitudeFilterMin !== null || altitudeFilterMax !== null || distanceFilterMin !== null || distanceFilterMax !== null || dateRange?.from || dateRange?.to || selectedDrones.length > 0 || selectedBatteries.length > 0 || selectedControllers.length > 0 || selectedTags.length > 0 || selectedColors.length > 0;
               return (
                 <div className={`relative rounded-lg border-2 transition-all duration-200 ${hasScrollboxFilter ? 'border-emerald-400/70 shadow-[0_0_12px_rgba(52,211,153,0.35),0_0_4px_rgba(52,211,153,0.2)]' : 'border-sky-400/50 shadow-[0_0_10px_rgba(56,189,248,0.25),0_0_4px_rgba(56,189,248,0.15)]'}`}>
                   <div className="max-h-[190px] overflow-y-auto overflow-x-hidden space-y-3 py-2.5 pl-2.5 pr-4 filter-scroll-area">
@@ -2118,6 +2177,102 @@ export function FlightList({
                       </div>
                     </div>
 
+                    {/* Controller filter */}
+                    {controllerOptions.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-400 whitespace-nowrap w-[52px] flex-shrink-0">{t('flightList.controller')}</label>
+                      <div className="relative flex-1 min-w-0">
+                        <button
+                          ref={controllerBtnRef}
+                          type="button"
+                          onClick={() => setIsControllerDropdownOpen((v) => !v)}
+                          className="input w-full text-xs h-8 px-3 py-1.5 flex items-center justify-between gap-2"
+                        >
+                          <span className={`truncate ${selectedControllers.length > 0 ? 'text-gray-100' : 'text-gray-400'}`}>
+                            {selectedControllers.length > 0
+                              ? selectedControllers.join(', ')
+                              : t('flightList.allControllers')}
+                          </span>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><polyline points="6 9 12 15 18 9" /></svg>
+                        </button>
+                        {isControllerDropdownOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => { setIsControllerDropdownOpen(false); setControllerSearch(''); }}
+                            />
+                            <div
+                              ref={controllerDropdownRef}
+                              className="fixed z-50 max-h-56 rounded-lg border border-gray-700 bg-drone-surface shadow-xl flex flex-col overflow-hidden"
+                              style={(() => { const r = controllerBtnRef.current?.getBoundingClientRect(); return r ? { top: r.bottom + 4, left: r.left, width: r.width } : {}; })()}
+                            >
+                              {controllerOptions.length > 4 && (
+                                <div className="px-2 pt-2 pb-1 border-b border-gray-700 flex-shrink-0">
+                                  <input
+                                    type="text"
+                                    value={controllerSearch}
+                                    onChange={(e) => { setControllerSearch(e.target.value); setControllerHighlightedIndex(0); }}
+                                    onKeyDown={(e) => {
+                                      const sorted = getControllerSorted();
+                                      if (e.key === 'ArrowDown') { e.preventDefault(); setControllerHighlightedIndex((prev) => prev < sorted.length - 1 ? prev + 1 : 0); }
+                                      else if (e.key === 'ArrowUp') { e.preventDefault(); setControllerHighlightedIndex((prev) => prev > 0 ? prev - 1 : sorted.length - 1); }
+                                      else if (e.key === 'Enter' && sorted.length > 0) {
+                                        e.preventDefault();
+                                        const item = sorted[controllerHighlightedIndex];
+                                        if (item && (availableControllerSerials.has(item.value) || selectedControllers.includes(item.value))) setSelectedControllers((prev) => prev.includes(item.value) ? prev.filter((k) => k !== item.value) : [...prev, item.value]);
+                                      } else if (e.key === 'Escape') { e.preventDefault(); setIsControllerDropdownOpen(false); setControllerSearch(''); }
+                                    }}
+                                    placeholder={t('flightList.searchControllers')}
+                                    autoFocus
+                                    className="w-full bg-drone-dark text-xs text-gray-200 rounded px-2 py-1 border border-gray-600 focus:border-drone-primary focus:outline-none placeholder-gray-500"
+                                  />
+                                </div>
+                              )}
+                              <div className="overflow-auto flex-1">
+                                {(() => {
+                                  const sorted = getControllerSorted();
+                                  if (sorted.length === 0) return <p className="text-xs text-gray-500 px-3 py-2">{t('flightList.noMatchingControllers')}</p>;
+                                  return sorted.map((ctrl, index) => {
+                                    const isSelected = selectedControllers.includes(ctrl.value);
+                                    const isAvailable = availableControllerSerials.has(ctrl.value);
+                                    const isDisabled = !isSelected && !isAvailable;
+                                    return (
+                                      <button
+                                        key={ctrl.value}
+                                        type="button"
+                                        onClick={() => !isDisabled && setSelectedControllers((prev) => isSelected ? prev.filter((k) => k !== ctrl.value) : [...prev, ctrl.value])}
+                                        onMouseEnter={() => !isDisabled && setControllerHighlightedIndex(index)}
+                                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 transition-colors ${isDisabled ? 'opacity-35 cursor-default' : isSelected ? 'bg-purple-500/20 text-gray-800 dark:text-purple-200' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                                          } ${!isDisabled && index === controllerHighlightedIndex && !isSelected ? 'bg-gray-200/50 dark:bg-gray-700/50' : ''}`}
+                                      >
+                                        <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-400 dark:border-gray-600'
+                                          }`}>
+                                          {isSelected && (
+                                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                          )}
+                                        </span>
+                                        <span className="truncate">{ctrl.label}</span>
+                                      </button>
+                                    );
+                                  });
+                                })()}
+                                {selectedControllers.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { setSelectedControllers([]); setControllerSearch(''); setIsControllerDropdownOpen(false); }}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-white border-t border-gray-700"
+                                  >
+                                    {t('flightList.clearControllerFilter')}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    )}
+
                     {/* Tag filter */}
                     {allTags.length > 0 && (
                       <div className="flex items-center gap-2">
@@ -2472,6 +2627,7 @@ export function FlightList({
                   setDateRange(undefined);
                   setSelectedDrones([]);
                   setSelectedBatteries([]);
+                  setSelectedControllers([]);
                   setDurationFilterMin(null);
                   setDurationFilterMax(null);
                   setAltitudeFilterMin(null);

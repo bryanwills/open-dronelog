@@ -43,8 +43,11 @@ const PARSE_TIMEOUT_SECS: u64 = 40;
 struct ComponentSerials {
     aircraft: Option<String>,
     battery: Option<String>,
+    rc: Option<String>,
     /// Battery cycle count extracted from SmartBatteryStatic.loop_times (divided by 256)
     cycle_count: Option<i32>,
+    /// Battery life percentage from SmartBatteryStatic
+    battery_life: Option<i32>,
 }
 
 /// Scan raw records for ComponentSerial entries and return full-length serials.
@@ -65,6 +68,10 @@ fn extract_component_serials(records: &[Record]) -> ComponentSerials {
                     log::debug!("ComponentSerial: Battery SN = {} ({} chars)", sn, sn.len());
                     result.battery = Some(sn);
                 }
+                ComponentType::RC => {
+                    log::debug!("ComponentSerial: RC SN = {} ({} chars)", sn, sn.len());
+                    result.rc = Some(sn);
+                }
                 _ => {}
             }
         }
@@ -77,6 +84,14 @@ fn extract_component_serials(records: &[Record]) -> ComponentSerials {
                 // Keep the maximum cycle count seen across all SmartBatteryStatic records
                 result.cycle_count = Some(
                     result.cycle_count.map_or(normalized, |prev| prev.max(normalized))
+                );
+            }
+            // Extract battery life from SmartBatteryStatic
+            let battery_life_val = sbs.battery_life as i32;
+            if battery_life_val > 0 {
+                log::debug!("SmartBatteryStatic: battery_life={}", battery_life_val);
+                result.battery_life = Some(
+                    result.battery_life.map_or(battery_life_val, |prev| prev.min(battery_life_val))
                 );
             }
         }
@@ -352,6 +367,12 @@ impl<'a> LogParser<'a> {
             point_count: points.len() as i32,
             photo_count,
             video_count,
+            rc_serial: component_serials.rc.clone()
+                .or_else(|| {
+                    let sn = parser.details.rc_sn.trim().to_uppercase();
+                    if sn.is_empty() { None } else { Some(sn) }
+                }),
+            battery_life: component_serials.battery_life,
         };
 
         log::info!(
@@ -918,6 +939,15 @@ impl<'a> LogParser<'a> {
             point.battery_voltage = Some(battery.voltage as f64);
             point.battery_current = Some(battery.current as f64);
             point.battery_temp = Some(battery.temperature as f64);
+            // Extract battery capacity telemetry
+            let full_cap = battery.full_capacity as f64;
+            if full_cap > 0.0 {
+                point.battery_full_capacity = Some(full_cap);
+            }
+            let remained_cap = battery.current_capacity as f64;
+            if remained_cap > 0.0 {
+                point.battery_remained_capacity = Some(remained_cap);
+            }
             // Extract individual cell voltages if available
             point.cell_voltages = if !battery.cell_voltages.is_empty() {
                 Some(battery.cell_voltages.iter().map(|v| *v as f64).collect())

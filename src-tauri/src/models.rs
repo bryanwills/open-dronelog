@@ -29,6 +29,8 @@ pub struct FlightMetadata {
     pub point_count: i32,
     pub photo_count: i32,
     pub video_count: i32,
+    pub rc_serial: Option<String>,
+    pub battery_life: Option<i32>,
 }
 
 /// Flight summary for list display
@@ -54,6 +56,8 @@ pub struct Flight {
     pub point_count: Option<i32>,
     pub photo_count: Option<i32>,
     pub video_count: Option<i32>,
+    pub rc_serial: Option<String>,
+    pub battery_life: Option<i32>,
     #[serde(default)]
     pub tags: Vec<FlightTag>,
     pub notes: Option<String>,
@@ -107,6 +111,8 @@ pub struct TelemetryPoint {
     pub battery_voltage: Option<f64>,
     pub battery_current: Option<f64>,
     pub battery_temp: Option<f64>,
+    pub battery_full_capacity: Option<f64>,
+    pub battery_remained_capacity: Option<f64>,
     pub cell_voltages: Option<Vec<f64>>,
 
     // Status
@@ -145,6 +151,9 @@ pub struct TelemetryRecord {
     pub battery_percent: Option<i32>,
     pub battery_voltage: Option<f64>,
     pub battery_temp: Option<f64>,
+    pub battery_current: Option<f64>,
+    pub battery_full_capacity: Option<f64>,
+    pub battery_remained_capacity: Option<f64>,
     pub cell_voltages: Option<Vec<f64>>,
     pub pitch: Option<f64>,
     pub roll: Option<f64>,
@@ -293,6 +302,12 @@ pub struct TelemetryData {
     pub battery_voltage: Vec<Option<f64>>,
     /// Battery temperature series
     pub battery_temp: Vec<Option<f64>>,
+    /// Battery current series
+    pub battery_current: Vec<Option<f64>>,
+    /// Battery full capacity series (mAh)
+    pub battery_full_capacity: Vec<Option<f64>>,
+    /// Battery remaining capacity series (mAh)
+    pub battery_remained_capacity: Vec<Option<f64>>,
     /// Individual cell voltages series (JSON arrays stored as Vec)
     pub cell_voltages: Vec<Option<Vec<f64>>>,
     /// Number of GPS satellites
@@ -347,6 +362,9 @@ impl TelemetryData {
         let mut battery = Vec::with_capacity(n);
         let mut battery_voltage = Vec::with_capacity(n);
         let mut battery_temp = Vec::with_capacity(n);
+        let mut battery_current = Vec::with_capacity(n);
+        let mut battery_full_capacity = Vec::with_capacity(n);
+        let mut battery_remained_capacity = Vec::with_capacity(n);
         let mut cell_voltages = Vec::with_capacity(n);
         let mut satellites = Vec::with_capacity(n);
         let mut rc_signal = Vec::with_capacity(n);
@@ -377,6 +395,9 @@ impl TelemetryData {
             battery.push(r.battery_percent);
             battery_voltage.push(r.battery_voltage);
             battery_temp.push(r.battery_temp);
+            battery_current.push(r.battery_current);
+            battery_full_capacity.push(r.battery_full_capacity);
+            battery_remained_capacity.push(r.battery_remained_capacity);
             cell_voltages.push(r.cell_voltages.clone());
             satellites.push(r.satellites);
             rc_signal.push(r.rc_signal);
@@ -408,6 +429,9 @@ impl TelemetryData {
             battery,
             battery_voltage,
             battery_temp,
+            battery_current,
+            battery_full_capacity,
+            battery_remained_capacity,
             cell_voltages,
             satellites,
             rc_signal,

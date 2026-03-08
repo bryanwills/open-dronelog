@@ -142,6 +142,17 @@ export async function getOverviewStats(): Promise<OverviewStats> {
   return invoke('get_overview_stats') as Promise<OverviewStats>;
 }
 
+export async function getBatteryFullCapacityHistory(
+  batterySerial: string,
+): Promise<[number, string, number][]> {
+  if (isWeb) {
+    const params = new URLSearchParams({ battery_serial: batterySerial });
+    return fetchJson<[number, string, number][]>(`/battery_capacity_history?${params}`);
+  }
+  const invoke = await getTauriInvoke();
+  return invoke('get_battery_full_capacity_history', { batterySerial }) as Promise<[number, string, number][]>;
+}
+
 export async function getFlightData(
   flightId: number,
   maxPoints?: number,

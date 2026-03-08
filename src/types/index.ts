@@ -33,6 +33,8 @@ export interface Flight {
   tags?: FlightTag[];
   notes?: string | null;
   color?: string | null;
+  rcSerial?: string | null;
+  batteryLife?: number | null;
 }
 
 /** Telemetry data formatted for ECharts */
@@ -70,6 +72,12 @@ export interface TelemetryData {
   isVideo?: (boolean | null)[];
   /** Flight mode (e.g., "GPS", "ATTI", "Sport") */
   flightMode?: (string | null)[];
+  /** Battery current draw in mA */
+  batteryCurrent?: (number | null)[];
+  /** Battery design / full charge capacity in mAh */
+  batteryFullCapacity?: (number | null)[];
+  /** Battery remaining capacity in mAh */
+  batteryRemainedCapacity?: (number | null)[];
 }
 
 /** App tip/warning/caution message from DJI flight log */

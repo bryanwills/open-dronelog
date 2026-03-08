@@ -538,9 +538,9 @@ async fn create_manual_flight(
         photo_count: 0,
         video_count: 0,
         cycle_count: None,
+        rc_serial: None,
+        battery_life: None,
     };
-
-    // Insert flight
     pdb.db
         .insert_flight(&metadata)
         .map_err(|e| err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to insert flight: {}", e)))?;
@@ -651,6 +651,22 @@ async fn get_overview_stats(
         .get_overview_stats()
         .map_err(|e| err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get overview stats: {}", e)))?;
     Ok(Json(stats))
+}
+
+/// GET /api/battery_capacity_history — Get battery full capacity history for a battery serial
+#[derive(Deserialize)]
+struct BatteryCapacityHistoryQuery {
+    battery_serial: String,
+}
+
+async fn get_battery_full_capacity_history(
+    pdb: ProfileDb,
+    Query(params): Query<BatteryCapacityHistoryQuery>,
+) -> Result<Json<Vec<(i64, String, f64)>>, (StatusCode, Json<ErrorResponse>)> {
+    let history = pdb.db
+        .get_battery_full_capacity_history(&params.battery_serial)
+        .map_err(|e| err_response(StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get battery capacity history: {}", e)))?;
+    Ok(Json(history))
 }
 
 /// DELETE /api/flights/:id — Delete a flight
@@ -1088,6 +1104,8 @@ async fn regenerate_flight_smart_tags(
         photo_count: flight.photo_count.unwrap_or(0),
         video_count: flight.video_count.unwrap_or(0),
         cycle_count: flight.cycle_count,
+        rc_serial: flight.rc_serial.clone(),
+        battery_life: flight.battery_life,
     };
 
     match pdb.db.get_flight_telemetry(flight_id, Some(50000), None) {
@@ -1158,6 +1176,8 @@ async fn regenerate_smart_tags(
                     photo_count: flight.photo_count.unwrap_or(0),
                     video_count: flight.video_count.unwrap_or(0),
                     cycle_count: flight.cycle_count,
+                    rc_serial: flight.rc_serial.clone(),
+                    battery_life: flight.battery_life,
                 };
 
                 match pdb.db.get_flight_telemetry(*flight_id, Some(50000), None) {
@@ -2047,6 +2067,7 @@ pub fn build_router(state: WebAppState) -> Router {
         .route("/api/flights", get(get_flights))
         .route("/api/flight_data", get(get_flight_data))
         .route("/api/overview", get(get_overview_stats))
+        .route("/api/battery_capacity_history", get(get_battery_full_capacity_history))
         .route("/api/flights/delete", delete(delete_flight))
         .route("/api/flights/delete_all", delete(delete_all_flights))
         .route("/api/flights/deduplicate", post(deduplicate_flights))
