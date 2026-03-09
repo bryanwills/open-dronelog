@@ -479,6 +479,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       { value: 'en-US', label: 'MM/DD/YYYY' },
                       { value: 'de-DE', label: 'DD.MM.YYYY' },
                       { value: 'nl-NL', label: 'DD-MM-YYYY' },
+                      { value: 'sv-SE', label: 'YYYY-MM-DD' },
                       { value: 'ja-JP', label: 'YYYY/MM/DD' },
                       { value: 'zh-CN', label: 'YYYY/M/D' },
                       { value: 'ko-KR', label: 'YYYY. M. D.' },
