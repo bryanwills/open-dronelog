@@ -390,7 +390,6 @@ export function Overview({ stats, flights, unitSystem, onSelectFlight }: Overvie
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Battery Health Indicators */}
         <div className="card p-4">
-          <h3 className="text-sm font-semibold text-white mb-3">{t('overview.batteryHealth')}</h3>
           <BatteryHealthList
             batteries={filteredStats.batteriesUsed}
             filteredFlights={filteredFlights}
@@ -1100,6 +1099,8 @@ function CalendarIcon() {
   );
 }
 
+type SortMode = 'progress' | 'name';
+
 function DroneFlightTimeList({
   drones,
   isLight,
@@ -1119,11 +1120,14 @@ function DroneFlightTimeList({
   const [editingSerial, setEditingSerial] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('progress');
 
   if (drones.length === 0) {
     return (
       <div className="card p-4">
-        <h3 className="text-sm font-semibold text-white mb-3">{t('overview.droneFlightTime')}</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-white">{t('overview.droneFlightTime')}</h3>
+        </div>
         <p className="text-sm text-gray-400">{t('overview.noDroneData')}</p>
       </div>
     );
@@ -1134,6 +1138,24 @@ function DroneFlightTimeList({
   for (const d of drones) {
     if (d.totalDurationSecs > maxDuration) maxDuration = d.totalDurationSecs;
   }
+
+  // Sort drones: decommissioned always at bottom, then by selected criterion
+  const sortedDrones = [...drones].sort((a, b) => {
+    const aDecom = isDecommissioned(a.displayLabel);
+    const bDecom = isDecommissioned(b.displayLabel);
+    if (aDecom !== bDecom) return aDecom ? 1 : -1;
+    if (sortMode === 'name') {
+      const aName = a.droneSerial
+        ? getDroneDisplayName(a.droneSerial, a.aircraftName || a.droneModel)
+        : (a.aircraftName || a.droneModel);
+      const bName = b.droneSerial
+        ? getDroneDisplayName(b.droneSerial, b.aircraftName || b.droneModel)
+        : (b.aircraftName || b.droneModel);
+      return aName.localeCompare(bName);
+    }
+    // progress = by duration descending (default)
+    return b.totalDurationSecs - a.totalDurationSecs;
+  });
 
   const handleStartRename = (serial: string, fallbackName: string) => {
     setEditingSerial(serial);
@@ -1176,9 +1198,19 @@ function DroneFlightTimeList({
 
   return (
     <div className="card p-4">
-      <h3 className="text-sm font-semibold text-white mb-3">{t('overview.droneFlightTime')}</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-white">{t('overview.droneFlightTime')}</h3>
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          className="sort-select text-[10px] px-1.5 py-0.5 rounded border cursor-pointer outline-none"
+        >
+          <option value="progress">{t('overview.sortByProgress')}</option>
+          <option value="name">{t('overview.sortByName')}</option>
+        </select>
+      </div>
       <div className="space-y-2 max-h-[200px] overflow-y-auto" style={{ padding: '0 8px 0 4px' }}>
-        {drones.map((drone) => {
+        {sortedDrones.map((drone) => {
           const fallbackName = drone.aircraftName || drone.droneModel;
           const displayName = drone.droneSerial ? getDroneDisplayName(drone.droneSerial, fallbackName) : fallbackName;
           const hasDuplicate = (displayNameCounts.get(displayName) || 0) > 1;
@@ -1561,6 +1593,7 @@ function BatteryHealthList({
   const [editingSerial, setEditingSerial] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>('progress');
 
   // Battery selection for capacity chart
   const [selectedCapBatteries, setSelectedCapBatteries] = useState<string[]>([]);
@@ -1716,11 +1749,38 @@ function BatteryHealthList({
   }, [capacityHistory, getBatteryDisplayName, selectedCapBatteries]);
 
   if (batteries.length === 0) {
-    return <p className="text-sm text-gray-400">{t('overview.noBatteryDataAvailable')}</p>;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white">{t('overview.batteryHealth')}</h3>
+        </div>
+        <p className="text-sm text-gray-400">{t('overview.noBatteryDataAvailable')}</p>
+      </div>
+    );
   }
 
   // Estimate health based on flight count (assuming 400 cycles = end of life)
   const maxCycles = 400;
+
+  // Sort batteries: decommissioned always at bottom, then by selected criterion
+  const sortedBatteries = [...batteries].sort((a, b) => {
+    const aDecom = isDecommissioned(getBatteryDisplayName(a.batterySerial));
+    const bDecom = isDecommissioned(getBatteryDisplayName(b.batterySerial));
+    if (aDecom !== bDecom) return aDecom ? 1 : -1;
+    if (sortMode === 'name') {
+      const aName = getBatteryDisplayName(a.batterySerial);
+      const bName = getBatteryDisplayName(b.batterySerial);
+      return aName.localeCompare(bName);
+    }
+    // progress = by health percentage ascending (lowest first = needs attention first)
+    const healthA = a.maxCycleCount != null
+      ? Math.max(0, 100 - (a.maxCycleCount / maxCycles) * 100)
+      : Math.max(0, 100 - (a.flightCount / maxCycles) * 100);
+    const healthB = b.maxCycleCount != null
+      ? Math.max(0, 100 - (b.maxCycleCount / maxCycles) * 100)
+      : Math.max(0, 100 - (b.flightCount / maxCycles) * 100);
+    return healthA - healthB;
+  });
 
   const handleStartRename = (serial: string) => {
     setEditingSerial(serial);
@@ -1887,8 +1947,19 @@ function BatteryHealthList({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between mb-0">
+        <h3 className="text-sm font-semibold text-white">{t('overview.batteryHealth')}</h3>
+        <select
+          value={sortMode}
+          onChange={(e) => setSortMode(e.target.value as SortMode)}
+          className="sort-select text-[10px] px-1.5 py-0.5 rounded border cursor-pointer outline-none"
+        >
+          <option value="progress">{t('overview.sortByProgress')}</option>
+          <option value="name">{t('overview.sortByName')}</option>
+        </select>
+      </div>
       <div className="space-y-2 max-h-[200px] overflow-y-auto" style={{ padding: '0 16px 0 10px' }}>
-        {batteries.map((battery) => {
+        {sortedBatteries.map((battery) => {
           const cycleCount = battery.maxCycleCount;
           const healthPercent = cycleCount != null
             ? Math.max(0, 100 - (cycleCount / maxCycles) * 100)

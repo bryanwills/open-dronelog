@@ -216,6 +216,8 @@
     "top3Longest": "Top 3 Longest Flights",
     "top3Furthest": "Top 3 Furthest Flights",
     "droneFlightTime": "Drone Flight Time",
+    "sortByProgress": "Progress",
+    "sortByName": "Name",
     "maintenance": "Maintenance",
     "batteryMaintenance": "Battery Maintenance",
     "aircraftMaintenance": "Aircraft Maintenance",

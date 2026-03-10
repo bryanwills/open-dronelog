@@ -91,6 +91,28 @@ body.theme-light .bg-gray-700 {
   background-color: #e2e8f0 !important;
 }
 
+/* Sort dropdown in overview panels */
+.sort-select {
+  background-color: rgb(var(--drone-dark)) !important;
+  border-color: rgb(var(--drone-muted) / 0.5) !important;
+  color: #9ca3af !important;
+  color-scheme: dark;
+}
+.sort-select option {
+  background-color: rgb(var(--drone-dark)) !important;
+  color: #9ca3af !important;
+}
+body.theme-light .sort-select {
+  background-color: rgb(var(--drone-dark)) !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+  color-scheme: light;
+}
+body.theme-light .sort-select option {
+  background-color: rgb(var(--drone-surface)) !important;
+  color: #475569 !important;
+}
+
 /* Light mode: toggle switch off state - darker gray background */
 body.theme-light .toggle-track-off {
   background-color: rgb(203, 213, 225) !important;

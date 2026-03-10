@@ -597,6 +597,7 @@ export function FlightClusterMap({
           style={{ width: '100%', height: '100%' }}
           mapStyle={activeMapStyle}
           attributionControl={false}
+          cooperativeGestures={true}
           onMove={(evt) => {
             const { longitude, latitude, zoom } = evt.viewState;
             setViewport({ longitude, latitude, zoom });
