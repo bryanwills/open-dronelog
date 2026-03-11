@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   resolve-tag:
     runs-on: ubuntu-latest
@@ -51,12 +54,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-tag.outputs.tag }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || needs.resolve-tag.outputs.tag }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install frontend dependencies
