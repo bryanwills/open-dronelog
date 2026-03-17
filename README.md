@@ -482,13 +482,25 @@ I have shipped this project with my own API key to save you from some extra pain
 
 ## Contribution Guidelines
 
-We welcome meaningful contributions to Open DroneLog! Before implementing a new feature, please open an issue first to discuss your idea with the maintainer—this ensures alignment with the project's scope and avoids wasted effort.
+We welcome meaningful contributions to Open DroneLog! 
+
+> [!IMPORTANT]
+>
+> Before implementing a new feature or fixing an existing bug, please **open an issue first** to discuss your idea with the maintainer to ensure it aligns with the project's scope and avoid any wasted effort on both ends.
+>
+> If you are using AI to help with your contribution, please disclose this in your PR and make sure you understand the code you are submitting. Please test the desired features throughly to ensure they work as expected and no existing features are broken.
 
 For more details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### User Scripts
 
 Looking to extend functionality without waiting for official features? Check out the **[Discussions](https://github.com/arpanghosh8453/open-dronelog/discussions)** channel with the `User-Script` tag, where community members share custom scripts, collaborate with developers, and find useful enhancements for custom workflow.
+
+### Custom Parsers
+
+Open DroneLog supports optional external parser plugins for bringing in logs from additional formats beyond the built-in DJI/Litchi/Airdata support. You can configure parser definitions, map fields, and control how imported data is normalized.
+
+See the guide: [custom parser documentation](/docs/custom_parsers.md).
 
 
 ## Socials and Support
@@ -506,6 +518,9 @@ Looking to extend functionality without waiting for official features? Check out
 ## Love this project?
 
 I'm thrilled that you're using this dashboard. Your interest and engagement mean a lot to me! You can view and analyze more detailed DJI flight statistics with this setup than paying for any commertial solution.
+
+> [!NOTE]
+> I am a big drone enthusiast myself, and currently fundraising for a DJI Neo 2 drone for myself to test the new features of this budget friendly drone. If you'd like to support this goal, please consider [donating here](https://ko-fi.com/arpandesign/goal).
 
 Maintaining and improving this project takes a significant amount of my free time. Your support helps keep me motivated to add new features and work on similar projects that benefit the community.
 
@@ -530,6 +545,28 @@ While some parts of this codebase were written with AI assistance (Claude Opus) 
 - [dji-log-parser](https://github.com/lvauvillier/dji-log-parser) - DJI log parsing
 - [DuckDB](https://duckdb.org/) - Analytical database
 - [Tauri](https://tauri.app/) - Desktop app framework
+
+## Sponsors
+
+<table width="100%" style="table-layout: fixed;">
+    <tr>
+        <th width="33.33%"><div align="center">Platinum Supporters</div></th>
+        <th width="33.33%"><div align="center">Gold Supporters</div></th>
+        <th width="33.33%"><div align="center">Silver Supporters</div></th>
+    </tr>
+    <tr>
+        <td align="center">
+            <a href="https://opendronelog.zenithdronesolutions.com/">
+                <img src="https://opendronelog.com/sponsors/zenithdronesolutions_dark.png" alt="Zenith Drone Solutions" style="width: 160px; max-width: 100%; height: auto; margin: 8px 12px;" />
+            </a>
+        </td>
+        <td align="center"><em>-</em></td>
+        <td align="center"><em>-</em></td>
+    </tr>
+</table>
+
+#### *Want to feature your logo and sponsor this project? [Get in touch](https://opendronelog.com/#sponsors).*
+
 
 ## Star History
 
