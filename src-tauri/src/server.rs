@@ -1355,7 +1355,9 @@ struct RemoveSyncBlacklistParams {
 }
 
 /// GET /api/sync/config — Get the sync folder path configuration
-async fn get_sync_config() -> Json<SyncResponse> {
+async fn get_sync_config(
+    _pdb: ProfileDb,
+) -> Json<SyncResponse> {
     let sync_path = std::env::var("SYNC_LOGS_PATH").ok();
     let auto_sync = std::env::var("SYNC_INTERVAL").is_ok();
     Json(SyncResponse {
