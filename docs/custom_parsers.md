@@ -208,12 +208,28 @@ If your custom parser script needs extra Python libraries (for example, `pandas`
 
 1. Edit `requirements.txt` and add your packages.
 2. Rebuild the Docker image (for local source builds):
-  - `docker compose -f docker-compose-build.yml build --no-cache open-dronelog`
+  - `cd open-dronelog && docker compose -f docker-compose-build.yml build --no-cache open-dronelog`
 3. Restart the container:
   - `docker compose -f docker-compose-build.yml up -d`
 
-The Dockerfile installs this file during build with:
-- `python3 -m pip install --no-cache-dir -r /app/requirements.txt`
+The Dockerfile installs this file during build inside a dedicated virtualenv (`/opt/parser-venv`) and prepends that venv to `PATH`, so parser commands like `python3` automatically use those installed packages.
+
+For Docker/web builds, prefer using the explicit venv interpreter path in `parsers.json`:
+
+```json
+{
+  "mappings": {
+    "mylog": {
+      "command": "/opt/parser-venv/bin/python",
+      "args": ["/app/plugins/my_parser.py", "$INPUT", "$OUTPUT"]
+    }
+  }
+}
+```
+
+Important:
+- Use `/opt/parser-venv/bin/python` as the interpreter (not `/opt/parser-venv/<script>.py`).
+- Keep your parser script path pointing to where it is mounted or copied (for example `/app/plugins/my_parser.py`). This is docker's internal path, so make sure to bind-mount this properly to your external location on host. 
 
 Notes:
 - This applies to images you build from source (`docker-compose-build.yml`).

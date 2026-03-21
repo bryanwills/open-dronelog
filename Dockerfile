@@ -78,6 +78,7 @@ FROM nginx:stable-bookworm AS runtime
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
+    python3-venv \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/*
@@ -85,7 +86,12 @@ RUN apt-get update && apt-get install -y \
 # Install optional Python dependencies for custom parser scripts.
 # Users can edit requirements.txt and rebuild the image.
 COPY requirements.txt /app/requirements.txt
-RUN python3 -m pip install --no-cache-dir -r /app/requirements.txt
+RUN python3 -m venv /opt/parser-venv && \
+    /opt/parser-venv/bin/python -m pip install --no-cache-dir -U pip && \
+    /opt/parser-venv/bin/python -m pip install --no-cache-dir -r /app/requirements.txt
+
+# Ensure parser commands like "python3" use the venv interpreter by default.
+ENV PATH="/opt/parser-venv/bin:${PATH}"
 
 # Copy backend binary
 COPY --from=backend-builder /build/src-tauri/target/release/open-dronelog /app/open-dronelog
@@ -107,7 +113,7 @@ RUN mkdir -p /data/drone-logbook
 ENV DATA_DIR=/data/drone-logbook
 ENV PORT=3001
 ENV HOST=127.0.0.1
-ENV RUST_LOG=info
+ENV RUST_LOG=DEBUG
 
 # Expose HTTP port
 EXPOSE 80
