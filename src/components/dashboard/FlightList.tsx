@@ -26,6 +26,12 @@ import ColorPickerModal from './ColorPickerModal';
 import { DatePickerPopover } from '@/components/ui/DatePickerPopover';
 import { buildHtmlReport, type HtmlReportFieldConfig, type FlightReportData } from '@/lib/htmlReportBuilder';
 import { fetchFlightWeather } from '@/lib/weather';
+import {
+  getBatteryGroupKey,
+  getBatteryGroupMembers,
+  getPairedBatteryDisplayName,
+  useBatteryPairIndex,
+} from '@/lib/batteryPairs';
 import 'react-day-picker/dist/style.css';
 import JSZip from 'jszip';
 
@@ -240,6 +246,7 @@ export function FlightList({
     useFlightStore();
 
   const { t } = useTranslation();
+  const batteryPairIndex = useBatteryPairIndex();
 
   // Resolve theme mode for styling
   const resolvedTheme = themeMode === 'system'
@@ -745,7 +752,10 @@ export function FlightList({
         }
         // Battery filter
         if (exclude !== 'battery' && selectedBatteries.length > 0) {
-          if (!flight.batterySerial || !selectedBatteries.includes(normalizeSerial(flight.batterySerial))) return false;
+          if (!flight.batterySerial) return false;
+          const serial = normalizeSerial(flight.batterySerial);
+          const groupKey = getBatteryGroupKey(serial, batteryPairIndex);
+          if (!selectedBatteries.includes(groupKey)) return false;
         }
         // Controller filter
         if (exclude !== 'controller' && selectedControllers.length > 0) {
@@ -812,7 +822,7 @@ export function FlightList({
       forPhoto: applyFilters('photo'),
       forVideo: applyFilters('video'),
     };
-  }, [flights, dateRange, selectedDrones, selectedBatteries, selectedControllers, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, photoFilterMin, videoFilterMin, mapAreaFilterEnabled, mapVisibleBounds]);
+  }, [flights, dateRange, selectedDrones, selectedBatteries, selectedControllers, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, photoFilterMin, videoFilterMin, mapAreaFilterEnabled, mapVisibleBounds, batteryPairIndex]);
 
   const mediaMaxima = useMemo(() => {
     let maxPhotos = 0;
@@ -857,14 +867,21 @@ export function FlightList({
   }, [flights, getDroneDisplayName, droneNameMap, getDisplaySerial, hideSerialNumbers]);
 
   const batteryOptions = useMemo(() => {
-    const unique = new Set<string>();
+    const grouped = new Map<string, { value: string; label: string; members: string[] }>();
     flights.forEach((flight) => {
-      if (flight.batterySerial) {
-        unique.add(normalizeSerial(flight.batterySerial));
-      }
+      const serial = normalizeSerial(flight.batterySerial);
+      if (!serial) return;
+      const groupKey = getBatteryGroupKey(serial, batteryPairIndex);
+      if (grouped.has(groupKey)) return;
+
+      grouped.set(groupKey, {
+        value: groupKey,
+        label: getPairedBatteryDisplayName(serial, batteryPairIndex, getBatteryDisplayName),
+        members: getBatteryGroupMembers(serial, batteryPairIndex),
+      });
     });
-    return Array.from(unique);
-  }, [flights]);
+    return Array.from(grouped.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [flights, batteryPairIndex, getBatteryDisplayName]);
 
   const controllerOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -886,13 +903,15 @@ export function FlightList({
     return keys;
   }, [crossFiltered.forDrone]);
 
-  const availableBatterySerials = useMemo(() => {
-    const serials = new Set<string>();
+  const availableBatteryGroups = useMemo(() => {
+    const groups = new Set<string>();
     crossFiltered.forBattery.forEach((f) => {
-      if (f.batterySerial) serials.add(normalizeSerial(f.batterySerial));
+      const serial = normalizeSerial(f.batterySerial);
+      if (!serial) return;
+      groups.add(getBatteryGroupKey(serial, batteryPairIndex));
     });
-    return serials;
-  }, [crossFiltered.forBattery]);
+    return groups;
+  }, [crossFiltered.forBattery, batteryPairIndex]);
 
   const availableControllerSerials = useMemo(() => {
     const serials = new Set<string>();
@@ -953,21 +972,19 @@ export function FlightList({
   // Helper: filtered & sorted battery list for multi-select dropdown
   // Order: selected first, then available, then unavailable (greyed out) at bottom
   const getBatterySorted = useCallback(() => {
-    const all = batteryOptions
-      .map((serial) => ({ value: serial, label: getBatteryDisplayName(serial) }));
-    const filtered = all.filter((b) => b.label.toLowerCase().includes(batterySearch.toLowerCase()));
+    const filtered = batteryOptions.filter((b) => b.label.toLowerCase().includes(batterySearch.toLowerCase()));
     return [...filtered].sort((a, b) => {
       const aSelected = selectedBatteries.includes(a.value);
       const bSelected = selectedBatteries.includes(b.value);
-      const aAvail = availableBatterySerials.has(a.value);
-      const bAvail = availableBatterySerials.has(b.value);
+      const aAvail = availableBatteryGroups.has(a.value);
+      const bAvail = availableBatteryGroups.has(b.value);
       if (aSelected && !bSelected) return -1;
       if (!aSelected && bSelected) return 1;
       if (aAvail && !bAvail) return -1;
       if (!aAvail && bAvail) return 1;
       return a.label.localeCompare(b.label);
     });
-  }, [batteryOptions, batterySearch, selectedBatteries, getBatteryDisplayName, availableBatterySerials]);
+  }, [batteryOptions, batterySearch, selectedBatteries, availableBatteryGroups]);
 
   // Helper: filtered & sorted controller list for multi-select dropdown
   const getControllerSorted = useCallback(() => {
@@ -1078,12 +1095,29 @@ export function FlightList({
   }, [droneOptions]);
 
   useEffect(() => {
-    const validSerials = new Set(batteryOptions);
-    setSelectedBatteries((prev) => {
-      const pruned = prev.filter((s) => validSerials.has(s));
-      return pruned.length !== prev.length ? pruned : prev;
+    const validSerials = new Set(batteryOptions.map((option) => option.value));
+    const serialToGroup = new Map<string, string>();
+    batteryOptions.forEach((option) => {
+      option.members.forEach((member) => {
+        serialToGroup.set(member, option.value);
+      });
     });
-  }, [batteryOptions]);
+
+    setSelectedBatteries((prev) => {
+      const migrated = prev
+        .map((value) => {
+          if (validSerials.has(value)) return value;
+          const raw = value.startsWith('solo:') ? value.slice(5) : value;
+          const normalized = normalizeSerial(raw);
+          return serialToGroup.get(normalized) ?? getBatteryGroupKey(normalized, batteryPairIndex);
+        })
+        .filter((value) => validSerials.has(value));
+
+      const deduped = Array.from(new Set(migrated));
+      const unchanged = deduped.length === prev.length && deduped.every((value, index) => value === prev[index]);
+      return unchanged ? prev : deduped;
+    });
+  }, [batteryOptions, batteryPairIndex]);
 
   useEffect(() => {
     const validControllers = new Set(controllerOptions);
@@ -1159,7 +1193,12 @@ export function FlightList({
       }
 
       if (selectedBatteries.length > 0) {
-        const matchesBattery = flight.batterySerial ? selectedBatteries.includes(normalizeSerial(flight.batterySerial)) : false;
+        const matchesBattery = (() => {
+          const serial = normalizeSerial(flight.batterySerial);
+          if (!serial) return false;
+          const groupKey = getBatteryGroupKey(serial, batteryPairIndex);
+          return selectedBatteries.includes(groupKey);
+        })();
         if (isFilterInverted ? matchesBattery : !matchesBattery) return false;
       }
 
@@ -1235,7 +1274,15 @@ export function FlightList({
 
       return true;
     });
-  }, [dateRange, flights, selectedBatteries, selectedControllers, selectedDrones, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, photoFilterMin, videoFilterMin, isFilterInverted, mapAreaFilterEnabled, mapVisibleBounds, searchQuery]);
+  }, [dateRange, flights, selectedBatteries, selectedControllers, selectedDrones, durationFilterMin, durationFilterMax, altitudeFilterMin, altitudeFilterMax, distanceFilterMin, distanceFilterMax, selectedTags, selectedColors, photoFilterMin, videoFilterMin, isFilterInverted, mapAreaFilterEnabled, mapVisibleBounds, searchQuery, batteryPairIndex]);
+
+  const batteryLabelByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    batteryOptions.forEach((option) => {
+      map.set(option.value, option.label);
+    });
+    return map;
+  }, [batteryOptions]);
 
   // Sync filtered flight IDs to the store so Overview can use them
   // Use useLayoutEffect to ensure sync happens synchronously before browser paint
@@ -2650,7 +2697,7 @@ export function FlightList({
                         >
                           <span className={`truncate ${selectedBatteries.length > 0 ? 'text-gray-100' : 'text-gray-400'}`}>
                             {selectedBatteries.length > 0
-                              ? selectedBatteries.map((s) => getBatteryDisplayName(s)).join(', ')
+                              ? selectedBatteries.map((key) => batteryLabelByKey.get(key) ?? key).join(', ')
                               : t('flightList.allBatteries')}
                           </span>
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><polyline points="6 9 12 15 18 9" /></svg>
@@ -2679,7 +2726,7 @@ export function FlightList({
                                       else if (e.key === 'Enter' && sorted.length > 0) {
                                         e.preventDefault();
                                         const item = sorted[batteryHighlightedIndex];
-                                        if (item && (availableBatterySerials.has(item.value) || selectedBatteries.includes(item.value))) setSelectedBatteries((prev) => prev.includes(item.value) ? prev.filter((k) => k !== item.value) : [...prev, item.value]);
+                                        if (item && (availableBatteryGroups.has(item.value) || selectedBatteries.includes(item.value))) setSelectedBatteries((prev) => prev.includes(item.value) ? prev.filter((k) => k !== item.value) : [...prev, item.value]);
                                       } else if (e.key === 'Escape') { e.preventDefault(); setIsBatteryDropdownOpen(false); setBatterySearch(''); }
                                     }}
                                     placeholder={t('flightList.searchBatteries')}
@@ -2694,7 +2741,7 @@ export function FlightList({
                                   if (sorted.length === 0) return <p className="text-xs text-gray-500 px-3 py-2">{t('flightList.noMatchingBatteries')}</p>;
                                   return sorted.map((bat, index) => {
                                     const isSelected = selectedBatteries.includes(bat.value);
-                                    const isAvailable = availableBatterySerials.has(bat.value);
+                                    const isAvailable = availableBatteryGroups.has(bat.value);
                                     const isDisabled = !isSelected && !isAvailable;
                                     return (
                                       <button

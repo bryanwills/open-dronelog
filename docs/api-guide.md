@@ -92,6 +92,7 @@ The telemetry response includes these arrays (all keyed by index):
 | `batteryTemp` | `f64[]` | Battery temperature (°C) |
 | `cellVoltages` | `f64[][]` | Per-cell voltages (array per frame) |
 | `pitch/roll/yaw` | `f64[]` | Aircraft attitude (degrees) |
+| `gimbalPitch/gimbalRoll/gimbalYaw` | `f64[]` | Gimbal attitude (degrees) |
 | `rcSignal` | `i32[]` | Remote controller signal strength |
 | `rcUplink/rcDownlink` | `i32[]` | Signal quality metrics |
 | `satellites` | `i32[]` | GPS satellite count |
@@ -310,6 +311,7 @@ These endpoints are only available in Docker/web deployment mode.
 | Method | Endpoint / Command | Description |
 |--------|-------------------|-------------|
 | GET | `/api/app_data_dir` | Get the application data directory path. |
+| GET | `/api/battery_pairs` | Get normalized battery serial pair definitions from `battery-pair.json` (web mode). |
 | GET | `/api/app_log_dir` | Get the application log directory path. |
 
 ### Tauri Commands (Desktop)
@@ -317,6 +319,7 @@ These endpoints are only available in Docker/web deployment mode.
 | Command | Parameters | Description |
 |---------|------------|-------------|
 | `get_app_data_dir` | - | Get data directory |
+| `get_battery_pairs` | - | Get normalized battery serial pair definitions from `battery-pair.json` |
 | `get_app_log_dir` | - | Get log directory |
 
 ---

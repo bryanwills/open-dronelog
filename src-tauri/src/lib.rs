@@ -1,5 +1,6 @@
 pub mod airdata_parser;
 pub mod api;
+pub mod battery_pairs;
 pub mod database;
 pub mod dronelogbook_parser;
 pub mod litchi_parser;

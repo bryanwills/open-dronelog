@@ -851,6 +851,14 @@ async fn get_app_data_dir(
     Json(state.data_dir.to_string_lossy().to_string())
 }
 
+/// GET /api/battery_pairs — Read battery pair definitions from battery-pair.json
+async fn get_battery_pairs(
+    AxumState(state): AxumState<WebAppState>,
+    _pdb: ProfileDb,
+) -> Json<Vec<String>> {
+    Json(crate::battery_pairs::load_battery_pairs(&state.data_dir))
+}
+
 /// GET /api/app_log_dir — Get the app log directory path
 async fn get_app_log_dir(
     AxumState(state): AxumState<WebAppState>,
@@ -2375,6 +2383,7 @@ pub fn build_router(state: WebAppState) -> Router {
         .route("/api/set_api_key", post(set_api_key))
         .route("/api/remove_api_key", delete(remove_api_key))
         .route("/api/app_data_dir", get(get_app_data_dir))
+        .route("/api/battery_pairs", get(get_battery_pairs))
         .route("/api/app_log_dir", get(get_app_log_dir))
         .route("/api/allowed_log_extensions", get(get_allowed_log_extensions))
         .route("/api/backup", get(export_backup))
@@ -2406,6 +2415,10 @@ pub fn build_router(state: WebAppState) -> Router {
 
 /// Start the Axum web server
 pub async fn start_server(data_dir: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    if let Err(e) = crate::battery_pairs::ensure_battery_pair_file(&data_dir) {
+        log::warn!("Failed to initialize battery-pair.json: {}", e);
+    }
+
     // Read persisted active profile
     let profile = database::get_active_profile(&data_dir);
     log::info!("Active profile: {}", profile);

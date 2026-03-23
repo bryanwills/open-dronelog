@@ -19,6 +19,7 @@ import {
   isDecommissioned,
 } from '@/lib/utils';
 import { useFlightStore } from '@/stores/flightStore';
+import { getPairedBatteryDisplayName, useBatteryPairIndex } from '@/lib/batteryPairs';
 
 interface FlightStatsProps {
   data: FlightDataResponse;
@@ -36,6 +37,7 @@ export function FlightStats({ data }: FlightStatsProps) {
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const addTagContainerRef = useRef<HTMLDivElement>(null);
+  const batteryPairIndex = useBatteryPairIndex();
 
   const flightTags = flight.tags ?? [];
 
@@ -159,6 +161,11 @@ export function FlightStats({ data }: FlightStatsProps) {
     }
   };
 
+  const batteryCapsuleLabel = flight.batterySerial
+    ? getPairedBatteryDisplayName(flight.batterySerial, batteryPairIndex, getBatteryDisplayName)
+    : null;
+  const batteryCapsuleIsDecommissioned = batteryCapsuleLabel ? isDecommissioned(batteryCapsuleLabel) : false;
+
   return (
     <div className="bg-drone-secondary border-b border-gray-700 px-4 py-3">
       {/* Flight Header */}
@@ -199,11 +206,11 @@ export function FlightStats({ data }: FlightStatsProps) {
               </span>
             )}
             {flight.batterySerial && (
-              <span className={`px-2 py-0.5 rounded-full text-xs border ${isDecommissioned(getBatteryDisplayName(flight.batterySerial))
+              <span className={`px-2 py-0.5 rounded-full text-xs border ${batteryCapsuleIsDecommissioned
                 ? 'border-gray-500/40 text-gray-400 bg-gray-500/15'
                 : 'border-drone-accent/40 text-drone-accent bg-drone-accent/10'
                 }`}>
-                {t('flightStats.battery')} {getBatteryDisplayName(flight.batterySerial)}
+                {t('flightStats.battery')} {batteryCapsuleLabel}
               </span>
             )}
             {flight.rcSerial && (

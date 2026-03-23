@@ -12,6 +12,13 @@ import 'react-day-picker/dist/style.css';
 import type { Flight, OverviewStats } from '@/types';
 import { getBatteryFullCapacityHistory } from '@/lib/api';
 import {
+  getBatteryGroupKey,
+  getBatteryGroupMembers,
+  getPairedBatteryDisplayName,
+  useBatteryPairIndex,
+} from '@/lib/batteryPairs';
+import type { BatteryPairIndex } from '@/lib/batteryPairs';
+import {
   formatDistance,
   formatDuration,
   formatSpeed,
@@ -70,6 +77,7 @@ export function Overview({ stats, flights, unitPrefs, onSelectFlight }: Overview
   const setMaintenanceThreshold = useFlightStore((state) => state.setMaintenanceThreshold);
   const performMaintenance = useFlightStore((state) => state.performMaintenance);
   const donationAcknowledged = useFlightStore((state) => state.donationAcknowledged);
+  const batteryPairIndex = useBatteryPairIndex();
   const resolvedTheme = useMemo(() => resolveThemeMode(themeMode), [themeMode]);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
 
@@ -109,7 +117,28 @@ export function Overview({ stats, flights, unitPrefs, onSelectFlight }: Overview
         });
       }
     });
-    const batteriesUsed = Array.from(batteryMap.entries())
+
+    // Pair-aware aggregation: each serial keeps its own row, but values include its paired battery.
+    const mergedBySerial = new Map<string, { count: number; duration: number; maxCycleCount: number | null }>();
+    for (const serial of batteryMap.keys()) {
+      const members = getBatteryGroupMembers(serial, batteryPairIndex);
+      const relevant = members.length > 0 ? members : [serial];
+      let count = 0;
+      let duration = 0;
+      let maxCycleCount: number | null = null;
+      for (const member of relevant) {
+        const usage = batteryMap.get(member);
+        if (!usage) continue;
+        count += usage.count;
+        duration += usage.duration;
+        if (usage.maxCycleCount != null) {
+          maxCycleCount = maxCycleCount != null ? Math.max(maxCycleCount, usage.maxCycleCount) : usage.maxCycleCount;
+        }
+      }
+      mergedBySerial.set(serial, { count, duration, maxCycleCount });
+    }
+
+    const batteriesUsed = Array.from(mergedBySerial.entries())
       .map(([serial, data]) => ({
         batterySerial: serial,
         flightCount: data.count,
@@ -118,8 +147,10 @@ export function Overview({ stats, flights, unitPrefs, onSelectFlight }: Overview
       }))
       .sort((a, b) => {
         // Decommissioned batteries go to the bottom
-        const aDecom = isDecommissioned(getBatteryDisplayName(a.batterySerial));
-        const bDecom = isDecommissioned(getBatteryDisplayName(b.batterySerial));
+        const aDisplay = getPairedBatteryDisplayName(a.batterySerial, batteryPairIndex, getBatteryDisplayName);
+        const bDisplay = getPairedBatteryDisplayName(b.batterySerial, batteryPairIndex, getBatteryDisplayName);
+        const aDecom = isDecommissioned(aDisplay);
+        const bDecom = isDecommissioned(bDisplay);
         if (aDecom !== bDecom) return aDecom ? 1 : -1;
         // Sort by health percentage (lowest first = needs attention first)
         const maxCycles = 400;
@@ -244,7 +275,27 @@ export function Overview({ stats, flights, unitPrefs, onSelectFlight }: Overview
       flightsByDate,
       topFlights,
     };
-  }, [filteredFlights, stats.maxDistanceFromHomeM, stats.topDistanceFlights, getDroneDisplayName, droneNameMap, getBatteryDisplayName, batteryNameMap, getDisplaySerial, hideSerialNumbers]);
+  }, [filteredFlights, stats.maxDistanceFromHomeM, stats.topDistanceFlights, getDroneDisplayName, droneNameMap, getBatteryDisplayName, batteryNameMap, getDisplaySerial, hideSerialNumbers, batteryPairIndex]);
+
+  const batteryDonutData = useMemo(() => {
+    const grouped = new Map<string, { value: number; displayName: string; decommissioned: boolean }>();
+    for (const battery of filteredStats.batteriesUsed) {
+      const groupKey = getBatteryGroupKey(battery.batterySerial, batteryPairIndex);
+      if (grouped.has(groupKey)) continue;
+      const label = getPairedBatteryDisplayName(battery.batterySerial, batteryPairIndex, getBatteryDisplayName);
+      grouped.set(groupKey, {
+        value: battery.flightCount,
+        displayName: label,
+        decommissioned: isDecommissioned(label),
+      });
+    }
+    return Array.from(grouped.entries()).map(([groupKey, item]) => ({
+      name: `battery-group:${groupKey}`,
+      displayName: item.displayName,
+      value: item.value,
+      decommissioned: item.decommissioned,
+    }));
+  }, [filteredStats.batteriesUsed, batteryPairIndex, getBatteryDisplayName]);
 
   const filteredTopDistanceFlights = useMemo(() => {
     if (!stats.topDistanceFlights?.length) return [] as typeof stats.topDistanceFlights;
@@ -340,13 +391,7 @@ export function Overview({ stats, flights, unitPrefs, onSelectFlight }: Overview
         <div className="card p-4">
           <h3 className="text-sm font-semibold text-white mb-3">{t('overview.flightsByBattery')}</h3>
           <DonutChart
-            data={filteredStats.batteriesUsed.map((b) => ({
-              // Keep a unique internal key so masked labels do not collapse into one segment.
-              name: `battery:${b.batterySerial}`,
-              displayName: getBatteryDisplayName(b.batterySerial),
-              value: b.flightCount,
-              decommissioned: isDecommissioned(getBatteryDisplayName(b.batterySerial)),
-            }))}
+            data={batteryDonutData}
             emptyMessage={t('overview.noBatteryData')}
           />
         </div>
@@ -489,6 +534,7 @@ export function Overview({ stats, flights, unitPrefs, onSelectFlight }: Overview
         isLight={resolvedTheme === 'light'}
         getBatteryDisplayName={getBatteryDisplayName}
         getDroneDisplayName={getDroneDisplayName}
+        batteryPairIndex={batteryPairIndex}
         maintenanceThresholds={maintenanceThresholds}
         maintenanceLastReset={maintenanceLastReset}
         setMaintenanceThreshold={setMaintenanceThreshold}
@@ -2212,6 +2258,7 @@ interface MaintenanceSectionProps {
   drones: { droneModel: string; droneSerial: string | null; aircraftName: string | null; flightCount: number; totalDurationSecs: number; displayLabel: string }[];
   flights: Flight[];
   isLight: boolean;
+  batteryPairIndex: BatteryPairIndex;
   getBatteryDisplayName: (serial: string) => string;
   getDroneDisplayName: (serial: string, fallbackName: string) => string;
   maintenanceThresholds: {
@@ -2231,6 +2278,7 @@ function MaintenanceSection({
   drones,
   flights,
   isLight,
+  batteryPairIndex,
   getBatteryDisplayName,
   getDroneDisplayName,
   maintenanceThresholds,
@@ -2307,10 +2355,21 @@ function MaintenanceSection({
     const date = getBatteryMaintenanceDate(serial);
     const maintenanceDate = new Date(date);
     maintenanceDate.setHours(23, 59, 59, 999);
-    performMaintenance('battery', serial, maintenanceDate);
+    const members = getBatteryGroupMembers(serial, batteryPairIndex);
+    const relevant = members.length > 0 ? members : [normalizeSerial(serial)];
+    console.debug('[battery-pairs] applying battery maintenance reset', {
+      selectedSerial: normalizeSerial(serial),
+      affectedSerials: relevant,
+      maintenanceDate: maintenanceDate.toISOString(),
+    });
+    for (const member of relevant) {
+      performMaintenance('battery', member, maintenanceDate);
+    }
     setBatteryMaintenanceDates(prev => {
       const updated = { ...prev };
-      delete updated[serial];
+      for (const member of relevant) {
+        delete updated[member];
+      }
       return updated;
     });
   };
@@ -2360,11 +2419,22 @@ function MaintenanceSection({
   // Calculate maintenance progress for a battery
   const getBatteryProgress = (batterySerial: string) => {
     const normalizedSerial = normalizeSerial(batterySerial);
-    const lastResetTime = maintenanceLastReset.battery[normalizedSerial];
-    const lastResetDate = lastResetTime ? new Date(lastResetTime) : null;
+    const members = getBatteryGroupMembers(normalizedSerial, batteryPairIndex);
+    const relevant = members.length > 0 ? members : [normalizedSerial];
+
+    let lastResetDate: Date | null = null;
+    for (const member of relevant) {
+      const lastResetTime = maintenanceLastReset.battery[member];
+      if (!lastResetTime) continue;
+      const date = new Date(lastResetTime);
+      if (!lastResetDate || date > lastResetDate) {
+        lastResetDate = date;
+      }
+    }
 
     const batteryFlights = flights.filter(f => {
-      if (normalizeSerial(f.batterySerial) !== normalizedSerial) return false;
+      const flightSerial = normalizeSerial(f.batterySerial);
+      if (!relevant.includes(flightSerial)) return false;
       if (!lastResetDate) return true;
       if (!f.startTime) return true;
       return new Date(f.startTime) > lastResetDate;
@@ -2461,15 +2531,24 @@ function MaintenanceSection({
   };
 
   // Battery list: filtered by search, sorted by combined progress
-  const batteryProgressList = batteries
-    .filter(b => !isDecommissioned(getBatteryDisplayName(b.batterySerial)))
+  const batteryProgressList = Array.from(
+    batteries.reduce((grouped, battery) => {
+      const groupKey = getBatteryGroupKey(battery.batterySerial, batteryPairIndex);
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, battery);
+      }
+      return grouped;
+    }, new Map<string, { batterySerial: string; flightCount: number; totalDurationSecs: number; maxCycleCount: number | null }>()).values(),
+  )
+    .filter(b => !isDecommissioned(getPairedBatteryDisplayName(b.batterySerial, batteryPairIndex, getBatteryDisplayName)))
     .map(b => {
       const progress = getBatteryProgress(b.batterySerial);
       const flightPercent = Math.min((progress.flights / maintenanceThresholds.battery.flights) * 100, 100);
       const airtimePercent = Math.min((progress.airtime / maintenanceThresholds.battery.airtime) * 100, 100);
+      const displayName = getPairedBatteryDisplayName(b.batterySerial, batteryPairIndex, getBatteryDisplayName);
       return {
         serial: b.batterySerial,
-        displayName: getBatteryDisplayName(b.batterySerial),
+        displayName,
         ...progress,
         combinedProgress: flightPercent + airtimePercent,
       };

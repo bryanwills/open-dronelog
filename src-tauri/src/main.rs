@@ -14,6 +14,7 @@
 
 mod airdata_parser;
 mod api;
+mod battery_pairs;
 mod database;
 mod dronelogbook_parser;
 mod litchi_parser;
@@ -208,6 +209,13 @@ mod tauri_app {
     fn init_database(app: &AppHandle) -> Result<Database, String> {
         let data_dir = app_data_dir_path(app)?;
         log::info!("Initializing database in: {:?}", data_dir);
+
+        if let Err(e) = crate::battery_pairs::ensure_battery_pair_file(&data_dir) {
+            log::warn!("Failed to initialize battery-pair.json: {}", e);
+        } else {
+            let pairs = crate::battery_pairs::load_battery_pairs(&data_dir);
+            log::info!("Loaded {} battery pair definitions", pairs.len());
+        }
 
         // Attempt to migrate data from old app identifier
         if let Err(e) = migrate_old_data(&data_dir) {
@@ -811,6 +819,11 @@ mod tauri_app {
     #[tauri::command]
     pub async fn get_app_data_dir(state: State<'_, AppState>) -> Result<String, String> {
         Ok(state.data_dir.to_string_lossy().to_string())
+    }
+
+    #[tauri::command]
+    pub async fn get_battery_pairs(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+        Ok(crate::battery_pairs::load_battery_pairs(&state.data_dir))
     }
 
     #[tauri::command]
@@ -1686,6 +1699,7 @@ mod tauri_app {
                 set_api_key,
                 remove_api_key,
                 get_app_data_dir,
+                get_battery_pairs,
                 get_app_log_dir,
                 get_equipment_names,
                 set_equipment_name,
@@ -1744,6 +1758,13 @@ async fn run_web() {
         });
 
     log::info!("Data directory: {:?}", data_dir);
+
+    if let Err(e) = crate::battery_pairs::ensure_battery_pair_file(&data_dir) {
+        log::warn!("Failed to initialize battery-pair.json: {}", e);
+    } else {
+        let pairs = crate::battery_pairs::load_battery_pairs(&data_dir);
+        log::info!("Loaded {} battery pair definitions", pairs.len());
+    }
 
     if let Err(e) = server::start_server(data_dir).await {
         log::error!("Server failed: {}", e);

@@ -440,6 +440,8 @@
           "Battery (multi-select)",
           "Color",
           "Tag (multi-select)",
+          "Photo count range",
+          "Video count range",
           "Duration range slider",
           "Altitude range slider",
           "Distance range slider",
@@ -467,7 +469,7 @@
       ],
       "activity_heatmap": "365-day 7×52 grid showing flight counts per day. Double-click to filter to that date.",
       "charts": "Donut charts: flights by drone model, battery serial, and duration bucket (Short <10min, Mid 10-20min, Long >20min). Radial polar chart: flights by time of day (24 segments, local hour estimated from takeoff longitude).",
-      "cluster_map": "MapLibre map with clustered flight locations and optional heatmap layer (toggle). Click clusters to zoom. Map area filter toggle with green glow border.",
+      "cluster_map": "MapLibre map with clustered flight locations and optional heatmap layer (toggle). Click clusters to zoom. Map area filter toggle with green glow border. Includes additional yellow home-point dots for visual emphasis.",
       "top_flights": "Top 3 longest (by duration) and top 3 furthest (by distance from home).",
       "battery_health": "Per-battery health bars (sorted by health %, lowest first), inline rename, per-minute usage history plot (scatter + smoothed line) with zoom slider. Shows cycle count when available from DJI SmartBatteryStatic data, otherwise falls back to flight count. Battery Capacity History chart: multi-select dropdown to pick batteries, scatter + smooth-line plot of max full-charge capacity per flight over time (y-axis min 250 mAh, dynamic max), defaults to most recently used battery, selected batteries sorted to top of dropdown, scrollable legend.",
       "maintenance_tracking": "Configurable flight and airtime thresholds for batteries and aircraft. Color-coded progress bars (green <60%, yellow 60-74%, orange 75-89%, red 90%+). Date-based maintenance recording.",
@@ -587,6 +589,7 @@
     ],
     "utility": [
       "GET    /api/app_data_dir        — Data directory path",
+      "GET    /api/battery_pairs       — Read normalized battery serial pairs from battery-pair.json",
       "GET    /api/app_log_dir         — Log directory path"
     ],
     "profiles": [

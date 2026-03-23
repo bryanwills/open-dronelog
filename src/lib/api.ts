@@ -410,6 +410,14 @@ export async function getAppDataDir(): Promise<string> {
   return invoke('get_app_data_dir') as Promise<string>;
 }
 
+export async function getBatteryPairs(): Promise<string[]> {
+  if (isWeb) {
+    return fetchJson<string[]>('/battery_pairs');
+  }
+  const invoke = await getTauriInvoke();
+  return invoke('get_battery_pairs') as Promise<string[]>;
+}
+
 export async function getAppLogDir(): Promise<string> {
   if (isWeb) {
     return fetchJson<string>('/app_log_dir');
