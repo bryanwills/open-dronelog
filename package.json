@@ -11,7 +11,12 @@
     "build:web": "VITE_BACKEND=web tsc && VITE_BACKEND=web vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri:nowatch": "tauri dev --no-watch"
+    "tauri:nowatch": "tauri dev --no-watch",
+    "context:extract": "node scripts/context/extract.mjs",
+    "context:validate": "node scripts/context/validate.mjs",
+    "context:build": "node scripts/context/build.mjs",
+    "context:check": "node scripts/context/check.mjs",
+    "context:install-hooks": "node scripts/context/install-hooks.mjs"
   },
   "dependencies": {
     "@deck.gl/layers": "^9.1.0",

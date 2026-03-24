@@ -76,6 +76,7 @@
 - [Profiles and Password Protection](#profiles-and-password-protection)
 - [Security Warning (Web/Docker)](#security-warning-webdocker)
 - [Configuration](#configuration)
+- [Context Management](#context-management)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [How to obtain your own DJI Developer API key](#how-to-obtain-your-own-dji-developer-api-key)
@@ -406,6 +407,20 @@ For production deployments, a reverse proxy with TLS is essential.
 - **API Guide**: Available API request paths and response structure is provided in the [API documentation](/docs/api-guide.md) page. 
 - **Log Files**: App logs are written to the platform-specific log directory and surfaced in Settings. In Docker mode, logs are written to stdout.
 
+## Context Management
+
+This project uses a modular, machine-parsable context system under `context/` for agentic development.
+
+- Setup and workflow guide: [`docs/context-management.md`](docs/context-management.md)
+- Context root documentation: [`context/README.md`](context/README.md)
+
+Core commands:
+
+```bash
+npm run context:build
+npm run context:check
+```
+
 ## Tech Stack
 
 ### Backend (Rust)
@@ -542,7 +557,7 @@ AGPL-3.0 - see [LICENSE](LICENSE) for details.
 
 ## Declaration
 
-While some parts of this codebase were written with AI assistance (Claude Opus) for convinience, the entirety of OpenDroneLog is thoughtfully architected, manually tested before every release, and managed by me in my free time. Long-term maintenance remain my priority with this project as it grows. The `context.json` file provides a machine parsable high quality summary of the project overview, which is updated alongside the project for future references.  
+While some parts of this codebase were written with AI assistance (Claude Opus 4.6 and GPT-5.3-Codex) for convinience, the entirety of OpenDroneLog is thoughtfully architected, manually tested before every release, and managed by me in my free time. Long-term maintenance remain my priority with this project as it grows. See [`docs/context-management.md`](docs/context-management.md) for more details on how the context management works for this project. This schema is given for people interested in building on top of this project with agentic workflow.  
 
 ## Acknowledgments
 

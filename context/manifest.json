@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "sourceFingerprints": {
+    "packageJson": "030bb1e85845438e74690ff83f124f1ba421e2ad9d6b373eba894dedb7c96715",
+    "cargoToml": "c2e1a04dcafb5539f2c0cbd147a1d67c6c48cb0be73b0709936497f3d346dbb0",
+    "serverRs": "51c212829b74884ba0d4543bec9c62ed8507ea71065b07e148e964397e1e2a09",
+    "apiTs": "6ba2a4fddafaa616f51b3b40e58375ab7f52a0652ab3058a0c590faf95d37dcd",
+    "databaseRs": "13096b9fcc9d61d85e42f10d829100b013f1f79a1d688a3a993659c842ad80ca",
+    "readmeEnvVars": "d342c61695983a75a3da838587ad78d0f5dbd0c3ea10fe176aa89b7ee6826b28",
+    "composeEnvVars": "d342c61695983a75a3da838587ad78d0f5dbd0c3ea10fe176aa89b7ee6826b28",
+    "composeBuildEnvVars": "d342c61695983a75a3da838587ad78d0f5dbd0c3ea10fe176aa89b7ee6826b28"
+  },
+  "artifacts": [
+    {
+      "id": "domain.architecture",
+      "type": "domain",
+      "file": "context/domains/architecture.json"
+    },
+    {
+      "id": "domain.project",
+      "type": "domain",
+      "file": "context/domains/project.json"
+    },
+    {
+      "id": "domain.runtime",
+      "type": "domain",
+      "file": "context/domains/runtime.json"
+    },
+    {
+      "id": "generated.api-routes",
+      "type": "generated",
+      "file": "context/generated/api-routes.json"
+    },
+    {
+      "id": "generated.db-schema",
+      "type": "generated",
+      "file": "context/generated/db-schema.json"
+    },
+    {
+      "id": "generated.deps-frontend",
+      "type": "generated",
+      "file": "context/generated/deps-frontend.json"
+    },
+    {
+      "id": "generated.deps-rust",
+      "type": "generated",
+      "file": "context/generated/deps-rust.json"
+    },
+    {
+      "id": "generated.env-vars",
+      "type": "generated",
+      "file": "context/generated/env-vars.json"
+    },
+    {
+      "id": "generated.openapi",
+      "type": "generated",
+      "file": "context/generated/openapi.json"
+    },
+    {
+      "id": "generated.tauri-commands",
+      "type": "generated",
+      "file": "context/generated/tauri-commands.json"
+    }
+  ],
+  "pointers": {
+    "linksGraph": "context/links/graph.json",
+    "schemaDir": "context/schema",
+    "domainsDir": "context/domains",
+    "generatedDir": "context/generated"
+  }
+}
