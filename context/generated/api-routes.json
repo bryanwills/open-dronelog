@@ -1,5 +1,5 @@
 {
-  "sourceFingerprint": "51c212829b74884ba0d4543bec9c62ed8507ea71065b07e148e964397e1e2a09",
+  "sourceFingerprint": "11f8577b055e648deee203eb3291e41b6975f173475d813c4b97355eebab2776",
   "sourceFile": "src-tauri/src/server.rs",
   "routes": [
     {
@@ -196,6 +196,11 @@
       "path": "/api/sync/blacklist/all",
       "method": "DELETE",
       "handler": "clear_sync_blacklist"
+    },
+    {
+      "path": "/api/sync/log_event",
+      "method": "POST",
+      "handler": "sync_log_event"
     },
     {
       "path": "/api/sync/files",

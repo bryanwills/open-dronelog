@@ -4,7 +4,7 @@
     "title": "Open DroneLog Generated API Surface",
     "version": "generated",
     "description": "Generated from src-tauri/src/server.rs router declarations.",
-    "x-source-fingerprint": "51c212829b74884ba0d4543bec9c62ed8507ea71065b07e148e964397e1e2a09"
+    "x-source-fingerprint": "11f8577b055e648deee203eb3291e41b6975f173475d813c4b97355eebab2776"
   },
   "paths": {
     "/api/import": {
@@ -380,6 +380,16 @@
     "/api/sync/blacklist/all": {
       "delete": {
         "operationId": "clear_sync_blacklist",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/sync/log_event": {
+      "post": {
+        "operationId": "sync_log_event",
         "responses": {
           "200": {
             "description": "Success"

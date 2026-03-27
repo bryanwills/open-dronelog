@@ -1,5 +1,5 @@
 {
-  "sourceFingerprint": "6ba2a4fddafaa616f51b3b40e58375ab7f52a0652ab3058a0c590faf95d37dcd",
+  "sourceFingerprint": "5b57dc0e8ac3b0f30a03e846a9c276591062b01fc68d6935949bab6367fbf481",
   "sourceFile": "src/lib/api.ts",
   "commands": [
     "add_flight_tag",
@@ -37,6 +37,7 @@
     "import_log",
     "is_app_locked",
     "list_profiles",
+    "log_sync_event",
     "regenerate_all_smart_tags",
     "regenerate_flight_smart_tags",
     "remove_all_auto_tags",
