@@ -426,6 +426,29 @@ export async function getAppLogDir(): Promise<string> {
   return invoke('get_app_log_dir') as Promise<string>;
 }
 
+export async function logSyncEvent(
+  level: 'debug' | 'info' | 'warn' | 'error',
+  message: string,
+  metadata?: Record<string, unknown>
+): Promise<boolean> {
+  if (isWeb) {
+    return fetchJson<boolean>('/sync/log_event', {
+      method: 'POST',
+      body: JSON.stringify({
+        level,
+        message,
+        metadata: metadata ? JSON.stringify(metadata) : null,
+      }),
+    });
+  }
+  const invoke = await getTauriInvoke();
+  return invoke('log_sync_event', {
+    level,
+    message,
+    metadata: metadata ? JSON.stringify(metadata) : null,
+  }) as Promise<boolean>;
+}
+
 // ============================================================================
 // Equipment Names (Battery/Aircraft custom display names)
 // ============================================================================

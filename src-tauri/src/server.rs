@@ -1358,6 +1358,14 @@ struct SyncBlacklistPayload {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SyncLogPayload {
+    level: String,
+    message: String,
+    metadata: Option<String>,
+}
+
+#[derive(Deserialize)]
 struct RemoveSyncBlacklistParams {
     file_hash: String,
 }
@@ -1429,6 +1437,28 @@ async fn clear_sync_blacklist(
     Ok(Json(true))
 }
 
+/// POST /api/sync/log_event — Write sync UI event into backend log stream
+async fn sync_log_event(
+    pdb: ProfileDb,
+    Json(payload): Json<SyncLogPayload>,
+) -> Json<bool> {
+    let level = payload.level.trim().to_ascii_lowercase();
+    let body = if let Some(meta) = payload.metadata {
+        format!("[SYNC][UI][{}] {} | {}", pdb.profile, payload.message, meta)
+    } else {
+        format!("[SYNC][UI][{}] {}", pdb.profile, payload.message)
+    };
+
+    match level.as_str() {
+        "debug" => log::debug!("{}", body),
+        "warn" | "warning" => log::warn!("{}", body),
+        "error" => log::error!("{}", body),
+        _ => log::info!("{}", body),
+    }
+
+    Json(true)
+}
+
 /// GET /api/sync/files — List all log files in the sync folder
 async fn get_sync_files(
     pdb: ProfileDb,
@@ -1486,28 +1516,64 @@ async fn get_sync_files(
         .into_iter()
         .collect();
 
-    let files: Vec<String> = entries
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_file() {
-                    let name = entry.file_name().to_string_lossy().to_lowercase();
-                    return has_allowed_extension(&name, &allowed_extensions);
+    let mut candidate_count = 0usize;
+    let mut skipped_existing = 0usize;
+    let mut skipped_blacklisted = 0usize;
+    let mut hash_errors = 0usize;
+    let mut files: Vec<String> = Vec::new();
+
+    for entry in entries.filter_map(|entry| entry.ok()) {
+        let is_allowed_file = entry
+            .file_type()
+            .ok()
+            .map(|file_type| {
+                if !file_type.is_file() {
+                    return false;
                 }
-            }
-            false
-        })
-        .filter_map(|entry| {
-            let path = entry.path();
-            // Check if file is already imported by hash
-            if let Ok(hash) = compute_file_hash(&path) {
-                if existing_hashes.contains(&hash) || blacklisted_hashes.contains(&hash) {
-                    return None; // Skip already imported files
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                has_allowed_extension(&name, &allowed_extensions)
+            })
+            .unwrap_or(false);
+
+        if !is_allowed_file {
+            continue;
+        }
+
+        candidate_count += 1;
+        let path = entry.path();
+        match compute_file_hash(&path) {
+            Ok(hash) => {
+                if existing_hashes.contains(&hash) {
+                    skipped_existing += 1;
+                    continue;
                 }
+                if blacklisted_hashes.contains(&hash) {
+                    skipped_blacklisted += 1;
+                    continue;
+                }
+                files.push(entry.file_name().to_string_lossy().to_string());
             }
-            Some(entry.file_name().to_string_lossy().to_string())
-        })
-        .collect();
+            Err(e) => {
+                hash_errors += 1;
+                log::warn!(
+                    "[SYNC][FILES][{}] hash failed for {}: {}",
+                    pdb.profile,
+                    path.display(),
+                    e
+                );
+            }
+        }
+    }
+
+    log::debug!(
+        "[SYNC][FILES][{}] candidates={}, new={}, skipped_existing={}, skipped_blacklisted={}, hash_errors={}",
+        pdb.profile,
+        candidate_count,
+        files.len(),
+        skipped_existing,
+        skipped_blacklisted,
+        hash_errors
+    );
 
     Ok(Json(SyncFilesResponse {
         files,
@@ -2391,6 +2457,7 @@ pub fn build_router(state: WebAppState) -> Router {
         .route("/api/sync/config", get(get_sync_config))
         .route("/api/sync/blacklist", get(get_sync_blacklist).post(add_sync_blacklist).delete(remove_sync_blacklist))
         .route("/api/sync/blacklist/all", delete(clear_sync_blacklist))
+        .route("/api/sync/log_event", post(sync_log_event))
         .route("/api/sync/files", get(get_sync_files))
         .route("/api/sync/file", post(sync_single_file))
         .route("/api/sync", post(sync_from_folder))
@@ -2500,16 +2567,16 @@ async fn start_sync_scheduler(state: WebAppState, cron_expr: &str) -> Result<(),
     let job = Job::new_async(cron_expr_owned.as_str(), move |_uuid, _lock| {
         let state = state_clone.clone();
         Box::pin(async move {
-            log::info!("Starting scheduled folder sync...");
+            log::info!("[SYNC][SCHEDULED] Starting scheduled folder sync...");
             match run_scheduled_sync(&state).await {
                 Ok((processed, skipped, errors)) => {
                     log::info!(
-                        "Scheduled sync complete: {} imported, {} skipped, {} errors",
+                        "[SYNC][SCHEDULED] Scheduled sync complete: {} imported, {} skipped, {} errors",
                         processed, skipped, errors
                     );
                 }
                 Err(e) => {
-                    log::error!("Scheduled sync failed: {}", e);
+                    log::error!("[SYNC][SCHEDULED] Scheduled sync failed: {}", e);
                 }
             }
         })
@@ -2533,6 +2600,7 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
         .map_err(|_| "SYNC_LOGS_PATH not configured".to_string())?;
 
     let profiles = database::list_profiles(&state.data_dir);
+    log::info!("[SYNC][SCHEDULED] Scheduled sync run started: profiles={}.", profiles.len());
     let allowed_extensions: std::collections::HashSet<String> = crate::plugins::get_allowed_extensions(&state.data_dir)
         .into_iter()
         .collect();
@@ -2575,6 +2643,7 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
             .collect();
 
         if log_files.is_empty() {
+            log::debug!("[SYNC][SCHEDULED][{}] no files with allowed extensions in {}", profile, sync_dir.display());
             continue;
         }
 
@@ -2587,6 +2656,65 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
                 continue;
             }
         };
+
+        // Pre-filter to only new files by hash: skip already-imported and blacklisted files.
+        let existing_hashes: std::collections::HashSet<String> = db
+            .get_all_file_hashes()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+        let blacklisted_hashes: std::collections::HashSet<String> = db
+            .get_sync_blacklist_hashes()
+            .unwrap_or_default()
+            .into_iter()
+            .collect();
+
+        let mut new_log_files: Vec<PathBuf> = Vec::new();
+        let mut skipped_existing = 0usize;
+        let mut skipped_blacklisted = 0usize;
+        let mut skipped_hash_error = 0usize;
+
+        for file_path in &log_files {
+            match compute_file_hash(file_path) {
+                Ok(hash) => {
+                    if existing_hashes.contains(&hash) {
+                        skipped_existing += 1;
+                        total_skipped += 1;
+                        continue;
+                    }
+                    if blacklisted_hashes.contains(&hash) {
+                        skipped_blacklisted += 1;
+                        total_skipped += 1;
+                        continue;
+                    }
+                    new_log_files.push(file_path.clone());
+                }
+                Err(e) => {
+                    skipped_hash_error += 1;
+                    total_errors += 1;
+                    log::warn!(
+                        "[SYNC][SCHEDULED][{}] hash failed for {}: {}",
+                        profile,
+                        file_path.display(),
+                        e
+                    );
+                }
+            }
+        }
+
+        log::debug!(
+            "[SYNC][SCHEDULED][{}] candidates={}, new={}, skipped_existing={}, skipped_blacklisted={}, hash_errors={}",
+            profile,
+            log_files.len(),
+            new_log_files.len(),
+            skipped_existing,
+            skipped_blacklisted,
+            skipped_hash_error
+        );
+
+        if new_log_files.is_empty() {
+            continue;
+        }
 
         let parser = LogParser::new(&db);
 
@@ -2602,15 +2730,8 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
         };
         let tags_enabled = config.get("smart_tags_enabled").and_then(|v| v.as_bool()).unwrap_or(true);
 
-        for file_path in &log_files {
+        for file_path in &new_log_files {
             let file_name = file_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-
-            if let Ok(hash) = compute_file_hash(file_path) {
-                if db.is_sync_blacklisted(&hash).unwrap_or(false) {
-                    total_skipped += 1;
-                    continue;
-                }
-            }
 
             let parse_result = match parser.parse_log(file_path).await {
                 Ok(result) => result,
@@ -2619,7 +2740,7 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
                     continue;
                 }
                 Err(e) => {
-                    log::warn!("Scheduled sync [{}]: Failed to parse {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to parse {}: {}", profile, file_name, e);
                     total_errors += 1;
                     continue;
                 }
@@ -2639,7 +2760,7 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
             let flight_id = match db.insert_flight(&parse_result.metadata) {
                 Ok(id) => id,
                 Err(e) => {
-                    log::warn!("Scheduled sync [{}]: Failed to insert flight from {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to insert flight from {}: {}", profile, file_name, e);
                     total_errors += 1;
                     continue;
                 }
@@ -2647,7 +2768,7 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
 
             // Insert telemetry
             if let Err(e) = db.bulk_insert_telemetry(flight_id, &parse_result.points) {
-                log::warn!("Scheduled sync [{}]: Failed to insert telemetry for {}: {}", profile, file_name, e);
+                log::warn!("[SYNC][SCHEDULED][{}] Failed to insert telemetry for {}: {}", profile, file_name, e);
                 let _ = db.delete_flight(flight_id);
                 total_errors += 1;
                 continue;
@@ -2664,49 +2785,56 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
                     parse_result.tags.clone()
                 };
                 if let Err(e) = db.insert_flight_tags(flight_id, &tags) {
-                    log::warn!("Scheduled sync [{}]: Failed to insert tags for {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to insert tags for {}: {}", profile, file_name, e);
                 }
             }
 
             // Insert manual tags from re-imported CSV exports
             for manual_tag in &parse_result.manual_tags {
                 if let Err(e) = db.add_flight_tag(flight_id, manual_tag) {
-                    log::warn!("Scheduled sync [{}]: Failed to insert manual tag '{}' for {}: {}", profile, manual_tag, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to insert manual tag '{}' for {}: {}", profile, manual_tag, file_name, e);
                 }
             }
 
             // Auto-tag with profile name for non-default profiles
             if profile != "default" {
                 if let Err(e) = db.add_flight_tag(flight_id, profile) {
-                    log::warn!("Scheduled sync [{}]: Failed to insert profile tag for {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to insert profile tag for {}: {}", profile, file_name, e);
                 }
             }
 
             // Insert notes from re-imported CSV exports
             if let Some(ref notes) = parse_result.notes {
                 if let Err(e) = db.update_flight_notes(flight_id, Some(notes.as_str())) {
-                    log::warn!("Scheduled sync [{}]: Failed to insert notes for {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to insert notes for {}: {}", profile, file_name, e);
                 }
             }
 
             // Apply color from re-imported CSV exports
             if let Some(ref color) = parse_result.color {
                 if let Err(e) = db.update_flight_color(flight_id, color) {
-                    log::warn!("Scheduled sync [{}]: Failed to set color for {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to set color for {}: {}", profile, file_name, e);
                 }
             }
 
             // Insert app messages (tips and warnings) from DJI logs
             if !parse_result.messages.is_empty() {
                 if let Err(e) = db.insert_flight_messages(flight_id, &parse_result.messages) {
-                    log::warn!("Scheduled sync [{}]: Failed to insert messages for {}: {}", profile, file_name, e);
+                    log::warn!("[SYNC][SCHEDULED][{}] Failed to insert messages for {}: {}", profile, file_name, e);
                 }
             }
 
             total_processed += 1;
-            log::debug!("Scheduled sync [{}]: Imported {}", profile, file_name);
+            log::debug!("[SYNC][SCHEDULED][{}] Imported {}", profile, file_name);
         }
     }
+
+    log::info!(
+        "[SYNC][SCHEDULED] Scheduled sync run finished: imported={}, skipped={}, errors={}",
+        total_processed,
+        total_skipped,
+        total_errors
+    );
 
     Ok((total_processed, total_skipped, total_errors))
 }

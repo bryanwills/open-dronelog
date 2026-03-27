@@ -417,6 +417,32 @@ export function FlightList({
 
   const hasAnySidebarFilter = hasScrollboxFilter || mapAreaFilterEnabled || searchQuery.trim().length > 0;
 
+  const clearAllFilters = useCallback(() => {
+    setDateRange(undefined);
+    setSelectedDrones([]);
+    setSelectedBatteries([]);
+    setSelectedControllers([]);
+    setDurationFilterMin(null);
+    setDurationFilterMax(null);
+    setAltitudeFilterMin(null);
+    setAltitudeFilterMax(null);
+    setDistanceFilterMin(null);
+    setDistanceFilterMax(null);
+    setPhotoFilterMin(0);
+    setVideoFilterMin(0);
+    setSelectedTags([]);
+    setSelectedColors([]);
+    setSelectedFilterProfileName('none');
+    setShowCreateFilterProfileInline(false);
+    setNewFilterProfileName('');
+    setNewFilterProfileError(null);
+    setIsFilterProfileDropdownOpen(false);
+    setPendingDeleteFilterProfile(null);
+    setIsFilterInverted(false);
+    setMapAreaFilterEnabled(false);
+    setSearchQuery('');
+  }, [setMapAreaFilterEnabled]);
+
   const applySavedFilterSnapshot = useCallback((snapshot: SavedFilterSnapshot) => {
     isApplyingFilterProfileRef.current = true;
     setSelectedDrones(snapshot.selectedDrones);
@@ -2174,6 +2200,23 @@ export function FlightList({
                 </svg>
               </button>
             )}
+            {hasAnySidebarFilter && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearAllFilters();
+                }}
+                title={t('flightList.clearFilters')}
+                aria-label={t('flightList.clearFilters')}
+                className="w-5 h-5 rounded flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </span>
           <span
             className={`w-5 h-5 rounded-full border border-gray-600 flex items-center justify-center transition-transform duration-200 ${isFiltersCollapsed ? 'rotate-180' : ''
@@ -3339,31 +3382,7 @@ export function FlightList({
                 {t('flightList.logsSelected', { n: filteredFlights.length, total: flights.length })}
               </span>
               <button
-                onClick={() => {
-                  setDateRange(undefined);
-                  setSelectedDrones([]);
-                  setSelectedBatteries([]);
-                  setSelectedControllers([]);
-                  setDurationFilterMin(null);
-                  setDurationFilterMax(null);
-                  setAltitudeFilterMin(null);
-                  setAltitudeFilterMax(null);
-                  setDistanceFilterMin(null);
-                  setDistanceFilterMax(null);
-                  setPhotoFilterMin(0);
-                  setVideoFilterMin(0);
-                  setSelectedTags([]);
-                  setSelectedColors([]);
-                  setSelectedFilterProfileName('none');
-                  setShowCreateFilterProfileInline(false);
-                  setNewFilterProfileName('');
-                  setNewFilterProfileError(null);
-                  setIsFilterProfileDropdownOpen(false);
-                  setPendingDeleteFilterProfile(null);
-                  setIsFilterInverted(false);
-                  setMapAreaFilterEnabled(false);
-                  setSearchQuery('');
-                }}
+                onClick={clearAllFilters}
                 className="text-xs text-gray-400 hover:text-white"
               >
                 {t('flightList.clearFilters')}

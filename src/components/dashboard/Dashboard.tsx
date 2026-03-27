@@ -57,6 +57,7 @@ export function Dashboard() {
   // Track if telemetry panel is collapsed (slider pulled past minimum width)
   const [isTelemetryCollapsed, setIsTelemetryCollapsed] = useState(false);
   const [preCollapseSplit, setPreCollapseSplit] = useState<number | null>(null);
+  const [isImporterExternallyBusy, setIsImporterExternallyBusy] = useState(false);
   // Width of telemetry panel when collapsed (minimum visible width)
   const TELEMETRY_MIN_VISIBLE_WIDTH = 40;
   const TELEMETRY_MIN_NORMAL_WIDTH = 720;
@@ -159,12 +160,24 @@ export function Dashboard() {
   }, []);  // Run once on mount — store setter handles subsequent changes synchronously
 
   useEffect(() => {
+    const handleImporterBusyChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ busy?: boolean }>;
+      setIsImporterExternallyBusy(Boolean(customEvent.detail?.busy));
+    };
+    window.addEventListener('importerBusyStateChanged', handleImporterBusyChange as EventListener);
+    return () => {
+      window.removeEventListener('importerBusyStateChanged', handleImporterBusyChange as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
     if (activeView === 'overview') {
       loadOverview();
     }
   }, [activeView, loadOverview]);
 
   const appIcon = new URL('../../assets/icon.png', import.meta.url).href;
+  const isImporterBusy = isImporting || isBatchProcessing || isImporterExternallyBusy;
 
   return (
     <div className={`flex h-full ${showSettings ? 'modal-open' : ''}`}>
@@ -276,21 +289,40 @@ export function Dashboard() {
           {/* Flight Importer */}
           <div className="border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center justify-between px-3 py-2">
-              <button
-                type="button"
-                onClick={() => setIsImporterCollapsed((v) => {
-                  const next = !v;
-                  if (!next) window.dispatchEvent(new CustomEvent('collapseFilters'));
-                  return next;
-                })}
-                className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors"
-              >
-                <span className={`font-medium ${(isImporting || isBatchProcessing) ? 'text-emerald-400' : ''}`}>
-                  {(isImporting || isBatchProcessing)
-                    ? (isImporterCollapsed !== false ? t('dashboard.importingExpand') : t('dashboard.importing'))
-                    : (isImporterCollapsed !== false ? t('dashboard.importExpand') : t('dashboard.import'))}
-                </span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsImporterCollapsed((v) => {
+                    const next = !v;
+                    if (!next) window.dispatchEvent(new CustomEvent('collapseFilters'));
+                    return next;
+                  })}
+                  className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition-colors"
+                >
+                  <span className={`font-medium ${isImporterBusy ? 'text-emerald-400' : ''}`}>
+                    {isImporterBusy
+                      ? (isImporterCollapsed !== false ? t('dashboard.importingExpand') : t('dashboard.importing'))
+                      : (isImporterCollapsed !== false ? t('dashboard.importExpand') : t('dashboard.import'))}
+                  </span>
+                </button>
+                {isImporterBusy && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(new CustomEvent('cancelImporterAction'));
+                    }}
+                    className="w-4 h-4 rounded-full text-red-400 hover:text-red-300 hover:bg-red-500/10 flex items-center justify-center"
+                    title="Cancel import/sync"
+                    aria-label="Cancel import/sync"
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-1">
                 {/* Sync Folder Config Button (desktop only) */}
                 {!isWebMode() && (

@@ -835,6 +835,29 @@ mod tauri_app {
     }
 
     #[tauri::command]
+    pub async fn log_sync_event(
+        level: String,
+        message: String,
+        metadata: Option<String>,
+    ) -> Result<bool, String> {
+        let level_lc = level.trim().to_ascii_lowercase();
+        let payload = if let Some(meta) = metadata {
+            format!("[SYNC][UI] {} | {}", message, meta)
+        } else {
+            format!("[SYNC][UI] {}", message)
+        };
+
+        match level_lc.as_str() {
+            "debug" => log::debug!("{}", payload),
+            "warn" | "warning" => log::warn!("{}", payload),
+            "error" => log::error!("{}", payload),
+            _ => log::info!("{}", payload),
+        }
+
+        Ok(true)
+    }
+
+    #[tauri::command]
     pub async fn get_equipment_names(state: State<'_, AppState>) -> Result<(Vec<(String, String)>, Vec<(String, String)>), String> {
         state.db_authenticated()?.get_all_equipment_names()
             .map_err(|e| format!("Failed to get equipment names: {}", e))
@@ -1701,6 +1724,7 @@ mod tauri_app {
                 get_app_data_dir,
                 get_battery_pairs,
                 get_app_log_dir,
+                log_sync_event,
                 get_equipment_names,
                 set_equipment_name,
                 export_backup,
