@@ -32,7 +32,7 @@
 - [Accessing flight log files](#accessing-flight-log-files)
   - [DJI Flight Logs](#dji-flight-logs)
   - [Litchi CSV Exports](#litchi-csv-exports)
-- [Setup and installation (Windows/MacOS)](#setup-and-installation-windowsmacos)
+- [Setup and installation (Windows/MacOS/Android)](#setup-and-installation-windowsmacos)
   - [Try the Webapp First](#try-the-webapp-first-no-installation-required)
   - [macOS Users: "Damaged File" Error Fix](#macos-users-damaged-file-error-fix)
 - [Usage](#usage)
@@ -161,6 +161,19 @@ There is no installation step if you want to use the standalone binary builds, j
 * **`Open.DroneLog-(version).x86_64.rpm`**: Package for **Fedora, CentOS, and Red Hat** systems.
 * **`Open.DroneLog_(version)_amd64.AppImage`**: Universal portable app. Runs on any Linux distro without installing.
 * **`open-dronelog_linux_x86_64`**: Command-line binary. For advanced terminal users only.
+
+### Android APK Releases
+
+Recommended for most users:
+* **`open-dronelog_(version)_android-universal.apk`**: Universal APK that works on most Android devices.
+
+Advanced / smaller download option:
+* **`open-dronelog_(version)_arm64-v8a_android.apk`**: Modern 64-bit ARM phones/tablets (most current Android devices).
+* **`open-dronelog_(version)_armeabi-v7a_android.apk`**: Older 32-bit ARM devices.
+* **`open-dronelog_(version)_x86_64_android.apk`**: 64-bit x86 devices/emulators.
+* **`open-dronelog_(version)_x86_android.apk`**: 32-bit x86 devices/emulators.
+
+If you are unsure which one to use, install the **universal APK**.
 
 ###  General / Verification
 * **`checksums.txt`**: Security file. Use to verify your downloaded files aren't corrupted or tampered with.
