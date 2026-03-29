@@ -88,6 +88,12 @@ if [ "$BUILD_APK" = "false" ] && [ "$BUILD_AAB" = "false" ]; then
   BUILD_APK="true"
 fi
 
+# Ensure the generated Android project exists (important for fresh CI runners).
+if [ ! -d "src-tauri/gen/android" ]; then
+  echo "Android project not initialized. Running: npx tauri android init"
+  npx tauri android init --config src-tauri/tauri.android.conf.json
+fi
+
 set -- npx tauri android build --config src-tauri/tauri.android.conf.json
 
 if [ "$MODE" = "debug" ]; then

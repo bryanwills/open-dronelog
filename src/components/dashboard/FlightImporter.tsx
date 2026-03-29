@@ -14,6 +14,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDropzone } from 'react-dropzone';
+import { sha256 } from 'js-sha256';
 import {
   isWebMode,
   pickFiles,
@@ -437,24 +438,41 @@ export function FlightImporter() {
       loadFlights().then(() => loadAllTags());
     };
 
-    // Get blacklist for sync mode (check before import to avoid wasted work)
+    // Get existing hashes + blacklist for sync mode, so we can skip duplicates before import.
+    const existingHashes = !isManualImport
+      ? new Set(
+          (await getFlights())
+            .map((flight) => flight.fileHash)
+            .filter((hash): hash is string => Boolean(hash))
+        )
+      : new Set<string>();
     const blacklist = !isManualImport ? await getBlacklist() : new Set<string>();
-    
-    // Helper to check if file is blacklisted (for sync mode only)
-    // Returns hash if blacklisted, null otherwise
-    const checkBlacklist = async (item: string | File): Promise<string | null> => {
-      if (isManualImport || blacklist.size === 0) return null;
-      
-      // Only works for file paths in Tauri mode
-      if (typeof item !== 'string') return null;
-      
+
+    const computeItemHash = async (item: string | File): Promise<string | null> => {
       try {
-        const hash = await computeFileHash(item);
-        return blacklist.has(hash) ? hash : null;
+        if (typeof item === 'string') {
+          return await computeFileHash(item);
+        }
+        const bytes = new Uint8Array(await item.arrayBuffer());
+        return sha256(bytes);
       } catch {
-        // If hash computation fails, proceed with import
+        // If hashing fails, proceed with import and rely on backend duplicate checks.
         return null;
       }
+    };
+
+    // For sync mode: pre-check existing + blacklist before import.
+    const checkSyncSkipReason = async (
+      item: string | File
+    ): Promise<'existing' | 'blacklisted' | null> => {
+      if (isManualImport) return null;
+      if (existingHashes.size === 0 && blacklist.size === 0) return null;
+
+      const hash = await computeItemHash(item);
+      if (!hash) return null;
+      if (existingHashes.has(hash)) return 'existing';
+      if (blacklist.has(hash)) return 'blacklisted';
+      return null;
     };
 
     const finalizeCancelledBatch = () => {
@@ -491,10 +509,14 @@ export function FlightImporter() {
             : `${item.name.slice(0, 50)}…`;
         setCurrentFileName(name);
 
-        // For sync mode: check blacklist BEFORE importing (much faster than import+delete)
-        const blacklistedHash = await checkBlacklist(item);
+        // For sync mode: check existing and blacklist BEFORE importing.
+        const skipReason = await checkSyncSkipReason(item);
         if (cancelRequestedRef.current) break;
-        if (blacklistedHash) {
+        if (skipReason === 'existing') {
+          skipped += 1;
+          continue;
+        }
+        if (skipReason === 'blacklisted') {
           blacklisted += 1;
           continue;
         }
@@ -575,10 +597,14 @@ export function FlightImporter() {
             : `${item.name.slice(0, 50)}…`;
         setCurrentFileName(name);
         
-        // For sync mode: check blacklist BEFORE importing (much faster than import+delete)
-        const blacklistedHash = await checkBlacklist(item);
+        // For sync mode: check existing and blacklist BEFORE importing.
+        const skipReason = await checkSyncSkipReason(item);
         if (cancelRequestedRef.current) break;
-        if (blacklistedHash) {
+        if (skipReason === 'existing') {
+          skipped += 1;
+          continue;
+        }
+        if (skipReason === 'blacklisted') {
           blacklisted += 1;
           continue;
         }
