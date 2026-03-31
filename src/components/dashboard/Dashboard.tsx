@@ -52,10 +52,10 @@ export function Dashboard() {
       const stored = localStorage.getItem('sidebarWidth');
       if (stored) {
         const parsed = Number(stored);
-        if (parsed >= 300 && parsed <= 420) return parsed;
+        if (parsed >= 340 && parsed <= 420) return parsed;
       }
     }
-    return 300;
+    return 340;
   });
   const [isSidebarHidden, setIsSidebarHidden] = useState(false);
   // Start with null, determine collapsed state after flights are loaded from DB
@@ -109,7 +109,7 @@ export function Dashboard() {
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (resizingRef.current === 'sidebar') {
-        const nextWidth = Math.min(Math.max(event.clientX, 300), 420);
+        const nextWidth = Math.min(Math.max(event.clientX, 340), 420);
         setSidebarWidth(nextWidth);
       }
       if (resizingRef.current === 'main') {
@@ -258,7 +258,7 @@ export function Dashboard() {
       {!isSidebarHidden && (
         <aside
           className="bg-drone-secondary md:border-r border-gray-700 flex flex-col z-50 fixed inset-0 md:relative md:inset-auto mobile-safe-container h-full overflow-y-auto overflow-x-hidden"
-          style={{ width: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : sidebarWidth, minWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 300 }}
+          style={{ width: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : sidebarWidth, minWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 340 }}
         >
           <div className="flex h-full flex-col" style={{ minHeight: sidebarMinHeight }}>
           <div className="p-4 border-b border-gray-700 flex items-center justify-between">
