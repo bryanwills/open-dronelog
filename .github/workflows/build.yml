@@ -1,4 +1,4 @@
-name: Build Tauri Binaries
+name: Desktop Build and Release
 
 on:
   release:
