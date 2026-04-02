@@ -135,12 +135,12 @@ The application is divided into three main areas:
 
 When a file is deleted from a sync-imported workflow, its content hash is added to the sync blacklist so scheduled folder sync will skip that file in future runs.
 
-You can manage these entries from **Settings → Data Management → Manage blacklisted logs (count)**:
+You can manage these entries from **Settings → Manage blacklisted logs (count)**:
 
 - View blacklisted entries with filename/presence status (when resolvable from the sync folder)
 - Select one or more entries and clear only the selected items
 
-You can also use manual import as an alternative removal path for specific files:
+You can also use manual import as an alternative blacklist removal for specific files:
 
 - Import the file via **Browse Files** or **Drag and Drop**
 - The app imports it and automatically removes that file hash from the sync blacklist in the same flow
