@@ -121,67 +121,51 @@ jobs:
 
       - name: Build Windows Tauri app (no release upload)
         if: runner.os == 'Windows'
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: '.'
-          args: '--target ${{ matrix.target }} --verbose'
-          includeRelease: false
-          uploadPlainBinary: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run tauri build -- --target "${{ matrix.target }}" --bundles nsis,msi --verbose
 
       - name: Collect unsigned Windows artifacts
         if: runner.os == 'Windows'
         shell: bash
-        env:
-          TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
           mkdir -p unsigned/exe unsigned/msi unsigned/other
 
-          # Resolve release output directory across possible cargo target layouts.
-          CANDIDATES=(
-            "src-tauri/target/$TARGET/release"
-            "src-tauri/target/release"
-            "target/$TARGET/release"
-            "target/release"
-          )
+          SEARCH_ROOTS=("src-tauri/target" "target")
+          FOUND_ANY_ROOT="false"
 
-          ROOT=""
-          for CANDIDATE in "${CANDIDATES[@]}"; do
-            if [ -d "$CANDIDATE" ]; then
-              ROOT="$CANDIDATE"
-              break
+          for BASE in "${SEARCH_ROOTS[@]}"; do
+            if [ ! -d "$BASE" ]; then
+              continue
             fi
+            FOUND_ANY_ROOT="true"
+            echo "Scanning $BASE for Windows artifacts"
+
+            # NSIS installer(s) and related files
+            find "$BASE" -type f -path '*/bundle/nsis/*.exe' -exec cp -v {} unsigned/exe/ \;
+            find "$BASE" -type f -path '*/bundle/nsis/*.nsis.zip' -exec cp -v {} unsigned/other/ \;
+            find "$BASE" -type f -path '*/bundle/nsis/*.sig' -exec cp -v {} unsigned/other/ \;
+
+            # MSI installer(s)
+            find "$BASE" -type f -path '*/bundle/msi/*.msi' -exec cp -v {} unsigned/msi/ \;
+
+            # Plain Windows executable from Cargo release output, excluding bundle artifacts.
+            find "$BASE" -type f -path '*/release/*.exe' ! -path '*/bundle/*' -exec cp -v {} unsigned/exe/ \;
           done
 
-          if [ -z "$ROOT" ]; then
-            echo "::error::Could not find Windows release output directory"
-            echo "Checked: ${CANDIDATES[*]}"
+          if [ "$FOUND_ANY_ROOT" != "true" ]; then
+            echo "::error::Could not find target directories (src-tauri/target or target)"
             exit 1
-          fi
-
-          echo "Using release output root: $ROOT"
-
-          # NSIS installer(s)
-          if [ -d "$ROOT/bundle/nsis" ]; then
-            find "$ROOT/bundle/nsis" -type f -name '*.exe' -exec cp -v {} unsigned/exe/ \;
-            find "$ROOT/bundle/nsis" -type f -name '*.nsis.zip' -exec cp -v {} unsigned/other/ \;
-            find "$ROOT/bundle/nsis" -type f -name '*.sig' -exec cp -v {} unsigned/other/ \;
-          fi
-
-          # Plain Windows binary
-          find "$ROOT" -maxdepth 1 -type f -name '*.exe' -exec cp -v {} unsigned/exe/ \;
-
-          # MSI installer(s)
-          if [ -d "$ROOT/bundle/msi" ]; then
-            find "$ROOT/bundle/msi" -type f -name '*.msi' -exec cp -v {} unsigned/msi/ \;
           fi
 
           EXE_COUNT=$(find unsigned/exe -type f -name '*.exe' | wc -l)
           MSI_COUNT=$(find unsigned/msi -type f -name '*.msi' | wc -l)
           if [ "$EXE_COUNT" -eq 0 ] || [ "$MSI_COUNT" -eq 0 ]; then
             echo "::error::Missing Windows build outputs (.exe/.msi)"
+            echo "Available target directories:"
+            find src-tauri target -maxdepth 3 -type d 2>/dev/null | sort || true
             exit 1
           fi
 
