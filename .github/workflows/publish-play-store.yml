@@ -201,6 +201,11 @@ jobs:
           echo "changes_not_sent_for_review=$CHANGES_NOT_SENT_FOR_REVIEW" >> "$GITHUB_OUTPUT"
           echo "rollout_fraction=$ROLLOUT_FRACTION" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare release notes
+        run: |
+          mkdir -p /tmp/whatsnew
+          echo "Release Notes: https://github.com/arpanghosh8453/open-dronelog/releases" > /tmp/whatsnew/whatsnew-en-US
+
       - name: Upload AAB to Google Play
         uses: r0adkll/upload-google-play@v1
         with:
@@ -209,5 +214,6 @@ jobs:
           releaseFiles: ${{ steps.sign_aab.outputs.signed_aab }}
           track: ${{ steps.publish_params.outputs.track }}
           status: ${{ steps.publish_params.outputs.release_status }}
+          whatsNewDirectory: /tmp/whatsnew
           userFraction: ${{ steps.publish_params.outputs.release_status == 'inProgress' && steps.publish_params.outputs.rollout_fraction || '' }}
           changesNotSentForReview: ${{ steps.publish_params.outputs.changes_not_sent_for_review }}
