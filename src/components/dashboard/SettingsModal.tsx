@@ -865,18 +865,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     onChange={(v) => setAppLanguage(v)}
                     listMaxHeight="max-h-[230px]"
                     options={[
-                      { value: 'en', label: 'English' },
                       { value: 'de', label: 'Deutsch' },
-                      { value: 'fr', label: 'Français' },
+                      { value: 'en', label: 'English' },
                       { value: 'es', label: 'Español' },
+                      { value: 'fr', label: 'Français' },
+                      { value: 'hu', label: 'Magyar' },
                       { value: 'it', label: 'Italiano' },
                       { value: 'nl', label: 'Nederlands' },
                       { value: 'pl', label: 'Polski' },
                       { value: 'pt', label: 'Português BR' },
-                      { value: 'ja', label: '日本語' },
+                      { value: 'tr', label: 'Turkce' },
                       { value: 'zh', label: '中文' },
+                      { value: 'ja', label: '日本語' },
                       { value: 'ko', label: '한국어' },
-                      { value: 'hu', label: 'Magyar' },
                     ]}
                   />
                 </div>
