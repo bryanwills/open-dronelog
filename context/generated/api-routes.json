@@ -1,5 +1,5 @@
 {
-  "sourceFingerprint": "3314227bf7e326803710daf879c03bf04b8b42f41acd6ce63c22dad8e9686478",
+  "sourceFingerprint": "1823aa3d8150f5dede05a4e0f45398ae021270d24d5d52d57ecb5f9d4c0cf312",
   "sourceFile": "src-tauri/src/server.rs",
   "routes": [
     {

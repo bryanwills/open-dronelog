@@ -280,6 +280,20 @@ environment:
   - PROFILE_CREATION_PASS=your-secret-master-password
 ```
 
+### Default Profile Password Bootstrap (Web/Docker Only)
+
+Administrators can optionally set `DEFAULT_PROFILE_PASSWORD` to initialize a password for the `default` profile at startup.
+
+```yaml
+environment:
+   - DEFAULT_PROFILE_PASSWORD=your-default-profile-password
+```
+
+Behavior details:
+- Applied only when the `default` profile does **not** already have a password
+- If a password is already set for `default`, startup **skips** initialization and logs that it was skipped
+- If the env var is unset or set to an empty string (and no existing password is present), `default` remains unprotected
+
 ---
 
 ## Flight List and Selection
@@ -1014,6 +1028,7 @@ Options to support the project and activate a supporter badge.
 1. **Always use a reverse proxy** (Nginx, Caddy, Traefik) with TLS termination in front of the container
 2. **Do not expose port 80** directly to the public internet
 3. Set `PROFILE_CREATION_PASS` to prevent unauthorized profile creation/deletion
+4. Optionally set `DEFAULT_PROFILE_PASSWORD` to avoid leaving the `default` profile unprotected on first startup
 
 ### Current security limitations
 
@@ -1089,6 +1104,7 @@ When a dropdown is open:
 - Mount your log folder for automatic import
 - Set the `SYNC_LOGS_PATH` environment variable to enable folder sync
 - Set the `SYNC_INTERVAL` environment variable with a cron expression for scheduled automatic sync (e.g., `0 0 */8 * * *` for every 8 hours)
+- Optionally set `DEFAULT_PROFILE_PASSWORD` to initialize a password for the `default` profile on first startup (never overwrites an existing one)
 - Data persists in the Docker volume and survives container updates
 
 ### Privacy

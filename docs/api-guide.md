@@ -192,6 +192,14 @@ All data operations use the active profile. In web/Docker mode, the active profi
 | POST | `/api/profiles/remove_password` | Remove profile password. Body: `{ profile, current_password }` |
 | GET | `/api/profiles/has_master_password` | Check if `PROFILE_CREATION_PASS` env var is configured. Returns boolean. |
 
+### Profile Security Environment Variables (Web/Docker)
+
+| Variable | Description |
+|----------|-------------|
+| `PROFILE_CREATION_PASS` | Requires a master password to create/delete profiles. |
+| `DEFAULT_PROFILE_PASSWORD` | Optional one-time initializer for the `default` profile password at startup. If `default` already has a password, initialization is skipped and the existing password is preserved. If unset or empty (and no existing password), `default` remains unprotected. |
+| `SESSION_TTL_HOURS` | Session lifetime after successful profile authentication. |
+
 ### Tauri Commands (Desktop)
 
 | Command | Parameters | Description |
@@ -287,6 +295,7 @@ These endpoints are only available in Docker/web deployment mode.
 |----------|-------------|
 | `SYNC_LOGS_PATH` | Path to folder containing flight logs to sync |
 | `SYNC_INTERVAL` | Cron expression for automatic sync (e.g., `0 0 */8 * * *`) |
+| `DEFAULT_PROFILE_PASSWORD` | Optional one-time initializer for the `default` profile password in web/Docker startup; does not overwrite an existing password |
 
 ---
 

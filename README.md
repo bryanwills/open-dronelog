@@ -325,6 +325,7 @@ When `KEEP_UPLOADED_FILES=true` is set, original log files are preserved in an `
 | `SYNC_INTERVAL` | (not set)              | Cron expression for scheduled sync (e.g., `0 0 */8 * * *` for every 8 hours)|
 | `KEEP_UPLOADED_FILES` | `true`      | When `true`, keeps copies of uploaded log files in the `uploaded` folder    |
 | `PROFILE_CREATION_PASS` | (not set) | Master password required for creating or deleting profiles in web/Docker mode. When unset, anyone can create and delete profiles. |
+| `DEFAULT_PROFILE_PASSWORD` | (not set) | Optional one-time initializer for the `default` profile password at startup. If a default password already exists, it is not overwritten and startup logs that initialization was skipped. If unset or empty (and no existing password), the default profile remains unprotected. |
 | `SESSION_TTL_HOURS` | `24`           | Session token lifetime in hours. After expiry the user must re-authenticate. |
 
 ### Automatic log sync (Docker)

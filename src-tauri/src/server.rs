@@ -2579,6 +2579,36 @@ pub async fn start_server(data_dir: PathBuf) -> Result<(), Box<dyn std::error::E
         log::warn!("Failed to initialize battery-pair.json: {}", e);
     }
 
+    // Optionally initialize the default profile password from env on first startup.
+    // This is one-time and non-destructive: existing passwords are never overwritten.
+    match std::env::var("DEFAULT_PROFILE_PASSWORD") {
+        Ok(default_pw) => {
+            if profile_auth::has_password(&data_dir, "default") {
+                log::info!(
+                    "Skipped DEFAULT_PROFILE_PASSWORD: default profile already has a password set"
+                );
+            } else if default_pw.is_empty() {
+                log::info!(
+                    "DEFAULT_PROFILE_PASSWORD is empty and no existing default profile password was found; default profile remains without a password"
+                );
+            } else if let Err(e) = profile_auth::set_password(&data_dir, "default", &default_pw, None) {
+                log::warn!(
+                    "Failed to set default profile password from DEFAULT_PROFILE_PASSWORD: {}",
+                    e
+                );
+            } else {
+                log::info!(
+                    "Set default profile password from DEFAULT_PROFILE_PASSWORD (first-time initialization)"
+                );
+            }
+            // Remove plaintext from process environment after startup handling.
+            std::env::remove_var("DEFAULT_PROFILE_PASSWORD");
+        }
+        Err(_) => {
+            log::debug!("DEFAULT_PROFILE_PASSWORD not set; leaving default profile password unchanged");
+        }
+    }
+
     // Read persisted active profile
     let profile = database::get_active_profile(&data_dir);
     log::info!("Active profile: {}", profile);
