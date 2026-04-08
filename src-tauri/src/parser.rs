@@ -36,6 +36,14 @@ use crate::models::{FlightMessage, FlightMetadata, FlightStats, TelemetryPoint};
 /// Maximum time allowed for parsing a single log file (seconds)
 const PARSE_TIMEOUT_SECS: u64 = 40;
 
+/// Reject GPS points that imply impossible jumps.
+const MAX_GPS_JUMP_DISTANCE_M: f64 = 1_500.0;
+const MAX_GPS_JUMP_SPEED_MPS: f64 = 120.0;
+/// Hard cap for plausible distance from home for DJI log telemetry points.
+const MAX_DISTANCE_FROM_HOME_M: f64 = 50_000.0;
+/// Hard cap for plausible jump distance between consecutive accepted GPS points.
+const MAX_GPS_STEP_DISTANCE_M: f64 = 50000.0;
+
 /// Full-length serial numbers extracted from ComponentSerial records.
 /// The details header in DJI logs truncates serials to 16 bytes, but
 /// Enterprise drones (e.g. Mavic 3 Enterprise) have 20-character SNs.
@@ -925,11 +933,15 @@ impl<'a> LogParser<'a> {
     fn extract_telemetry(&self, frames: &[Frame], details_total_time_secs: f64) -> Vec<TelemetryPoint> {
         let mut points = Vec::with_capacity(frames.len());
         let mut timestamp_ms: i64 = 0;
+        let mut home_gps: Option<(f64, f64)> = None;
+        let mut prev_valid_gps: Option<(f64, f64, i64)> = None;
 
         // Counters for logging
         let mut skipped_corrupt: usize = 0;
         let mut skipped_no_gps: usize = 0;
         let mut skipped_out_of_range: usize = 0;
+        let mut skipped_jump: usize = 0;
+        let mut skipped_far_from_home: usize = 0;
         let mut skipped_alt_clamp: usize = 0;
         let mut skipped_speed_clamp: usize = 0;
 
@@ -1001,13 +1013,56 @@ impl<'a> LogParser<'a> {
             };
 
             // Filter out invalid GPS coordinates:
-            //  - 0,0 means no GPS lock
-            //  - Values outside physical range (lat ±90, lon ±180) are corrupt data
+            //  - values outside physical range (lat ±90, lon ±180) are corrupt
+            //  - sudden huge jumps, >50km step jumps, and far-from-home outliers are rejected
             let has_gps_lock = !(osd.latitude.abs() < 1e-6 && osd.longitude.abs() < 1e-6);
             let gps_in_range = osd.latitude.abs() <= 90.0 && osd.longitude.abs() <= 180.0;
+            let mut has_valid_gps = false;
             if has_gps_lock && gps_in_range {
-                point.latitude = Some(osd.latitude);
-                point.longitude = Some(osd.longitude);
+                let lat = osd.latitude;
+                let lon = osd.longitude;
+                let mut rejected = false;
+
+                // Reject impossible position jumps compared to previous accepted GPS point.
+                if let Some((prev_lat, prev_lon, prev_ts)) = prev_valid_gps {
+                    let jump_m = haversine_distance(prev_lat, prev_lon, lat, lon);
+                    let dt_s = ((current_timestamp_ms - prev_ts).max(1) as f64) / 1000.0;
+                    let jump_speed_mps = jump_m / dt_s;
+
+                    // Hard sequence boundary: single-step jumps >50km are invalid.
+                    if jump_m > MAX_GPS_STEP_DISTANCE_M {
+                        skipped_jump += 1;
+                        rejected = true;
+                    }
+
+                    // Speed-aware jump rejection for shorter but still impossible jumps.
+                    if !rejected && jump_m > MAX_GPS_JUMP_DISTANCE_M && jump_speed_mps > MAX_GPS_JUMP_SPEED_MPS {
+                        skipped_jump += 1;
+                        rejected = true;
+                    }
+                }
+
+                // Reject points that are unrealistically far from established home.
+                if !rejected {
+                    if let Some((home_lat, home_lon)) = home_gps {
+                        let dist_from_home_m = haversine_distance(home_lat, home_lon, lat, lon);
+                        if dist_from_home_m > MAX_DISTANCE_FROM_HOME_M {
+                            skipped_far_from_home += 1;
+                            rejected = true;
+                        }
+                    }
+                }
+
+                if !rejected {
+                    point.latitude = Some(lat);
+                    point.longitude = Some(lon);
+                    has_valid_gps = true;
+
+                    if home_gps.is_none() {
+                        home_gps = Some((lat, lon));
+                    }
+                    prev_valid_gps = Some((lat, lon, current_timestamp_ms));
+                }
             } else if has_gps_lock && !gps_in_range {
                 skipped_out_of_range += 1;
             } else {
@@ -1022,15 +1077,15 @@ impl<'a> LogParser<'a> {
             point.height = if height.abs() < 10_000.0 { Some(height) } else { skipped_alt_clamp += 1; None };
             point.vps_height = Some(osd.vps_height as f64);
 
-            point.speed = if has_gps_lock && gps_in_range {
+            point.speed = if has_valid_gps {
                 let spd = (osd.x_speed.powi(2) + osd.y_speed.powi(2)).sqrt() as f64;
                 if spd < 100.0 { Some(spd) } else { skipped_speed_clamp += 1; None } // >100 m/s is clearly garbage
             } else {
                 None // Speed from 0,0 origin is meaningless
             };
-            point.velocity_x = if has_gps_lock && gps_in_range { Some(osd.x_speed as f64) } else { None };
-            point.velocity_y = if has_gps_lock && gps_in_range { Some(osd.y_speed as f64) } else { None };
-            point.velocity_z = if has_gps_lock && gps_in_range { Some(osd.z_speed as f64) } else { None };
+            point.velocity_x = if has_valid_gps { Some(osd.x_speed as f64) } else { None };
+            point.velocity_y = if has_valid_gps { Some(osd.y_speed as f64) } else { None };
+            point.velocity_z = if has_valid_gps { Some(osd.z_speed as f64) } else { None };
             point.pitch = Some(osd.pitch as f64);
             point.roll = Some(osd.roll as f64);
             point.yaw = Some(osd.yaw as f64);
@@ -1091,10 +1146,22 @@ impl<'a> LogParser<'a> {
         }
 
         // Log extraction summary
-        if skipped_corrupt > 0 || skipped_out_of_range > 0 || skipped_alt_clamp > 0 || skipped_speed_clamp > 0 {
+        if skipped_corrupt > 0
+            || skipped_out_of_range > 0
+            || skipped_jump > 0
+            || skipped_far_from_home > 0
+            || skipped_alt_clamp > 0
+            || skipped_speed_clamp > 0
+        {
             log::warn!(
-                "Telemetry filtering: {} corrupt frames skipped, {} GPS out-of-range, {} no-GPS-lock, {} altitude clamped, {} speed clamped",
-                skipped_corrupt, skipped_out_of_range, skipped_no_gps, skipped_alt_clamp, skipped_speed_clamp
+                "Telemetry filtering: {} corrupt frames skipped, {} GPS out-of-range, {} jump outliers skipped, {} >50km-home skipped, {} no-GPS-lock, {} altitude clamped, {} speed clamped",
+                skipped_corrupt,
+                skipped_out_of_range,
+                skipped_jump,
+                skipped_far_from_home,
+                skipped_no_gps,
+                skipped_alt_clamp,
+                skipped_speed_clamp
             );
         } else {
             log::debug!(
