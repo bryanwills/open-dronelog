@@ -535,9 +535,18 @@ function buildFlightColumns(
   }
   if (fc.batteryTemp) {
     const t = fd.data.telemetry.batteryTemp;
-    const first = t?.find((val) => val !== null);
-    if (first != null) {
-      perfItems.push({ label: tr('report.batTemp', 'Bat. Temp'), value: unitPrefs.temperature === 'imperial' ? `${(first * 9 / 5 + 32).toFixed(1)} °F` : `${first.toFixed(1)} °C` });
+    const validTemps = (t ?? []).filter((val): val is number => typeof val === 'number' && Number.isFinite(val) && Math.abs(val) >= 1e-6);
+    if (validTemps.length > 0) {
+      const first = validTemps[0];
+      const last = validTemps[validTemps.length - 1];
+      const formatTemp = (value: number): string => {
+        if (unitPrefs.temperature === 'imperial') return `${(value * 9 / 5 + 32).toFixed(1)}°F`;
+        return `${value.toFixed(1)}°C`;
+      };
+      perfItems.push({
+        label: tr('report.batTemp', 'Bat. Temp'),
+        value: `${formatTemp(first)} — ${formatTemp(last)}`,
+      });
     } else {
       perfItems.push({ label: tr('report.batTemp', 'Bat. Temp'), value: '—' });
     }

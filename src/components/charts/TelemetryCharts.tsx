@@ -143,9 +143,12 @@ function getFieldData(
     const rawData = data.batteryTemp;
     if (!rawData || !Array.isArray(rawData)) return [];
     if (unitSystem === 'imperial') {
-      return rawData.map(v => v === null || v === undefined ? null : v * 9 / 5 + 32);
+      return rawData.map(v => {
+        if (v === null || v === undefined || Math.abs(v) < 1e-6) return null;
+        return v * 9 / 5 + 32;
+      });
     }
-    return rawData as (number | null)[];
+    return rawData.map(v => (v === null || v === undefined || Math.abs(v) < 1e-6) ? null : v);
   }
 
   // Special handling for battery percentage and voltage: ignore 0 values
@@ -1665,7 +1668,11 @@ function createBatteryChart(
 ): EChartsOption {
   const batteryRange = computeRange(data.battery, { clampMin: 0, clampMax: 100 });
   const voltageRange = computeRange(data.batteryVoltage);
-  const tempRange = computeRange(data.batteryTemp);
+  const batteryTempSeries = (data.batteryTemp ?? []).map((value) => {
+    if (value === null || value === undefined || Math.abs(value) < 1e-6) return null;
+    return value;
+  });
+  const tempRange = computeRange(batteryTempSeries);
   return {
     ...baseChartConfig,
     tooltip: {
@@ -1793,7 +1800,7 @@ function createBatteryChart(
       {
         name: t('telemetry.temperature'),
         type: 'line',
-        data: data.batteryTemp,
+        data: batteryTempSeries,
         yAxisIndex: 1,
         smooth: true,
         symbol: 'none',
