@@ -180,6 +180,15 @@ fn compute_file_hash(path: &std::path::Path) -> Result<String, String> {
         .map_err(|e| format!("Failed to compute hash: {}", e))
 }
 
+fn should_apply_sync_cooldown(config_path: &std::path::Path) -> bool {
+    let app_data_dir = config_path
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+    let key_type = DjiApi::with_app_data_dir(app_data_dir).get_api_key_type();
+    key_type != "personal"
+}
+
 fn has_allowed_extension(file_name: &str, allowed_extensions: &std::collections::HashSet<String>) -> bool {
     let ext = file_name
         .rsplit('.')
@@ -1950,8 +1959,9 @@ async fn sync_from_folder(
         serde_json::json!({})
     };
     let tags_enabled = config.get("smart_tags_enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+    let apply_cooldown = should_apply_sync_cooldown(&config_path);
 
-    for file_path in log_files {
+    for (index, file_path) in log_files.iter().enumerate() {
         let file_name = file_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
 
         if let Ok(hash) = compute_file_hash(&file_path) {
@@ -2057,6 +2067,11 @@ async fn sync_from_folder(
 
         processed += 1;
         log::debug!("Synced: {}", file_name);
+
+        // Match browse-import policy for shared/default key usage.
+        if apply_cooldown && index < log_files.len().saturating_sub(1) {
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
     }
 
     let elapsed = start.elapsed().as_secs_f64();
@@ -2854,8 +2869,9 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
             serde_json::json!({})
         };
         let tags_enabled = config.get("smart_tags_enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+        let apply_cooldown = should_apply_sync_cooldown(&config_path);
 
-        for file_path in &new_log_files {
+        for (index, file_path) in new_log_files.iter().enumerate() {
             let file_name = file_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
 
             let parse_result = match parser.parse_log(file_path).await {
@@ -2951,6 +2967,11 @@ async fn run_scheduled_sync(state: &WebAppState) -> Result<(usize, usize, usize)
 
             total_processed += 1;
             log::debug!("[SYNC][SCHEDULED][{}] Imported {}", profile, file_name);
+
+            // Apply default-key cooldown between successful imports.
+            if apply_cooldown && index < new_log_files.len().saturating_sub(1) {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            }
         }
     }
 

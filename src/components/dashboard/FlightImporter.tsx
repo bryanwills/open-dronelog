@@ -1162,6 +1162,11 @@ export function FlightImporter() {
       setBatchMessage(null);
       
       try {
+        // Ensure API key type is fresh before deciding cooldown behavior.
+        await loadApiKeyType();
+        const currentApiKeyType = useFlightStore.getState().apiKeyType;
+        const hasPersonalKey = currentApiKeyType === 'personal';
+
         // First get the list of files to sync
         const filesResponse = await getSyncFiles();
         
@@ -1193,6 +1198,7 @@ export function FlightImporter() {
         let errors = 0;
         for (let i = 0; i < filesResponse.files.length; i++) {
           if (cancelRequestedRef.current) break;
+          const isLast = i === filesResponse.files.length - 1;
           const filename = filesResponse.files[i];
           setBatchIndex(i + 1);
           setCurrentFileName(filename.length > 50 ? `${filename.slice(0, 50)}…` : filename);
@@ -1205,6 +1211,12 @@ export function FlightImporter() {
               if (processed % REFRESH_INTERVAL === 0) {
                 const { loadFlights, loadAllTags } = useFlightStore.getState();
                 loadFlights().then(() => loadAllTags());
+              }
+
+              // Match browse import behavior: cooldown only for default/shared key.
+              if (!hasPersonalKey && !isLast) {
+                await runCooldown(5);
+                if (cancelRequestedRef.current) break;
               }
             } else if (
               result.message.toLowerCase().includes('already') ||
