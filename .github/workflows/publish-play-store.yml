@@ -183,7 +183,7 @@ jobs:
           if [ "${{ github.event_name }}" = "release" ]; then
             # Default automatic release behavior: full production rollout.
             PACKAGE_NAME="com.opendronelog"
-            TRACK="production"
+            TRACK="alpha"
             RELEASE_STATUS="completed"
             CHANGES_NOT_SENT_FOR_REVIEW="false"
             ROLLOUT_FRACTION="1.00"
