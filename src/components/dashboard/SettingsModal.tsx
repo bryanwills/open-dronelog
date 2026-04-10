@@ -724,16 +724,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {/* Units — custom dropdown with per-dimension toggles inside */}
                 {(() => {
-                  const allMetric = Object.values(unitPrefs).every(v => v === 'metric');
-                  const allImperial = Object.values(unitPrefs).every(v => v === 'imperial');
+                  const allMetric = unitPrefs.distance === 'metric' && unitPrefs.altitude === 'metric' && unitPrefs.temperature === 'metric' && unitPrefs.speed === 'kmh';
+                  const allImperial = unitPrefs.distance === 'imperial' && unitPrefs.altitude === 'imperial' && unitPrefs.temperature === 'imperial' && unitPrefs.speed === 'mph';
                   const summaryLabel = allMetric
                     ? `${t('settings.metric')} (m, km/h)`
                     : allImperial
                       ? `${t('settings.imperial')} (ft, mph)`
                       : t('settings.mixed', 'Mixed');
-                  const unitRows: { key: 'distance' | 'speed' | 'altitude' | 'temperature'; label: string; metricLabel: string; imperialLabel: string }[] = [
+                  const unitRows: { key: 'distance' | 'altitude' | 'temperature'; label: string; metricLabel: string; imperialLabel: string }[] = [
                     { key: 'distance', label: t('settings.unitDistance', 'Distance'), metricLabel: 'km', imperialLabel: 'mi' },
-                    { key: 'speed', label: t('settings.unitSpeed', 'Speed'), metricLabel: 'km/h', imperialLabel: 'mph' },
                     { key: 'altitude', label: t('settings.unitAltitude', 'Altitude'), metricLabel: 'm', imperialLabel: 'ft' },
                     { key: 'temperature', label: t('settings.unitTemperature', 'Temperature'), metricLabel: '°C', imperialLabel: '°F' },
                   ];
@@ -766,7 +765,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                             <div className={`flex gap-1 p-2 border-b ${isLight ? 'border-gray-200' : 'border-gray-700'}`}>
                               <button
                                 type="button"
-                                onClick={() => { for (const k of ['distance', 'speed', 'altitude', 'temperature'] as const) setUnitPref(k, 'metric'); }}
+                                onClick={() => {
+                                  for (const k of ['distance', 'altitude', 'temperature'] as const) setUnitPref(k, 'metric');
+                                  setUnitPref('speed', 'kmh');
+                                }}
                                 className={`flex-1 text-[11px] font-medium py-1 rounded-md transition-colors ${allMetric
                                   ? 'bg-drone-primary text-white'
                                   : isLight ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
@@ -774,7 +776,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                               >{t('settings.allMetric', 'All Metric')}</button>
                               <button
                                 type="button"
-                                onClick={() => { for (const k of ['distance', 'speed', 'altitude', 'temperature'] as const) setUnitPref(k, 'imperial'); }}
+                                onClick={() => {
+                                  for (const k of ['distance', 'altitude', 'temperature'] as const) setUnitPref(k, 'imperial');
+                                  setUnitPref('speed', 'mph');
+                                }}
                                 className={`flex-1 text-[11px] font-medium py-1 rounded-md transition-colors ${allImperial
                                   ? 'bg-drone-primary text-white'
                                   : isLight ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-gray-700/50 text-gray-300 hover:bg-gray-700'
@@ -805,6 +810,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 </div>
                               </div>
                             ))}
+                            <div className={`flex items-center justify-between px-3 py-[6px] ${isLight ? 'border-gray-100' : 'border-gray-700/40'}`}>
+                              <span className={`text-[11px] ${isLight ? 'text-gray-600' : 'text-gray-400'}`}>{t('settings.unitSpeed', 'Speed')}</span>
+                              <div className={`flex rounded-md overflow-hidden border ${isLight ? 'border-gray-300' : 'border-gray-600'}`}>
+                                {([
+                                  { key: 'kmh', label: 'km/h' },
+                                  { key: 'mph', label: 'mph' },
+                                  { key: 'ms', label: 'm/s' },
+                                  { key: 'fts', label: 'ft/s' },
+                                ] as const).map((option, idx) => (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() => setUnitPref('speed', option.key)}
+                                    className={`px-1.5 py-0.5 text-[10px] font-medium transition-colors ${idx > 0 ? (isLight ? 'border-l border-gray-300' : 'border-l border-gray-600') : ''} ${unitPrefs.speed === option.key
+                                      ? 'bg-drone-primary text-white'
+                                      : isLight ? 'bg-transparent text-gray-500 hover:text-gray-700' : 'bg-transparent text-gray-400 hover:text-gray-200'
+                                      }`}
+                                  >{option.label}</button>
+                                ))}
+                              </div>
+                            </div>
                           </div>
                         </>
                       )}

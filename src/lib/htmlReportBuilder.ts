@@ -8,7 +8,17 @@
 
 import type { Flight, FlightDataResponse, TelemetryData } from '@/types';
 import type { WeatherData } from '@/lib/weather';
-import { type UnitSystem, type UnitPreferences, ensureAmPmUpperCase, formatDateDisplay, formatDateHeader as utilFormatDateHeader } from '@/lib/utils';
+import {
+  type UnitSystem,
+  type UnitPreferences,
+  type SpeedUnit,
+  ensureAmPmUpperCase,
+  formatDateDisplay,
+  formatDateHeader as utilFormatDateHeader,
+  isImperialSpeedUnit,
+  speedMultiplierFromMs,
+  speedUnitLabel,
+} from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -225,11 +235,10 @@ function fmtDistance(meters: number | null, unitSystem: UnitSystem, locale?: str
   return `${fmt(meters, 0)} m`;
 }
 
-function fmtSpeed(ms: number | null, unitSystem: UnitSystem, locale?: string): string {
+function fmtSpeed(ms: number | null, speedUnit: SpeedUnit, locale?: string): string {
   if (ms === null || ms === undefined || ms === 0) return '—';
   const fmt = (n: number, d: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-  if (unitSystem === 'imperial') return `${fmt(ms * 2.236936, 1)} mph`;
-  return `${fmt(ms * 3.6, 1)} km/h`;
+  return `${fmt(ms * speedMultiplierFromMs(speedUnit), 1)} ${speedUnitLabel(speedUnit)}`;
 }
 
 function fmtAltitude(meters: number | null, unitSystem: UnitSystem, locale?: string): string {
@@ -354,10 +363,10 @@ function calculateMaxDistanceFromHome(telemetry: TelemetryData): number | null {
   return maxDistance;
 }
 
-function fmtWindSpeed(kmh: number, unitSystem: UnitSystem, locale?: string): string {
+function fmtWindSpeed(kmh: number, speedUnit: SpeedUnit, locale?: string): string {
   const fmt = (n: number, d: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-  if (unitSystem === 'imperial') return `${fmt(kmh * 0.621371, 1)} mph`;
-  return `${fmt(kmh, 1)} km/h`;
+  const speedMs = kmh / 3.6;
+  return `${fmt(speedMs * speedMultiplierFromMs(speedUnit), 1)} ${speedUnitLabel(speedUnit)}`;
 }
 
 function fmtTemp(c: number, unitSystem: UnitSystem, locale?: string): string {
@@ -366,15 +375,15 @@ function fmtTemp(c: number, unitSystem: UnitSystem, locale?: string): string {
   return `${fmt(c, 1)} °C`;
 }
 
-function fmtPrecip(mm: number, unitSystem: UnitSystem, locale?: string): string {
+function fmtPrecip(mm: number, speedUnit: SpeedUnit, locale?: string): string {
   const fmt = (n: number, d: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-  if (unitSystem === 'imperial') return `${fmt(mm * 0.03937, 2)} in`;
+  if (isImperialSpeedUnit(speedUnit)) return `${fmt(mm * 0.03937, 2)} in`;
   return `${fmt(mm, 1)} mm`;
 }
 
-function fmtPressure(hPa: number, unitSystem: UnitSystem, locale?: string): string {
+function fmtPressure(hPa: number, speedUnit: SpeedUnit, locale?: string): string {
   const fmt = (n: number, d: number) => new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
-  if (unitSystem === 'imperial') return `${fmt(hPa * 0.02953, 2)} inHg`;
+  if (isImperialSpeedUnit(speedUnit)) return `${fmt(hPa * 0.02953, 2)} inHg`;
   return `${hPa} hPa`;
 }
 

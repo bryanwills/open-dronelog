@@ -8,8 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { fetchFlightWeather, fetchReverseGeocodeLocation } from '@/lib/weather';
 import type { WeatherData } from '@/lib/weather';
-import type { UnitSystem } from '@/lib/utils';
-import { fmtNum } from '@/lib/utils';
+import type { SpeedUnit, UnitSystem } from '@/lib/utils';
+import { fmtNum, isImperialSpeedUnit, speedMultiplierFromMs, speedUnitLabel } from '@/lib/utils';
 import { useFlightStore } from '@/stores/flightStore';
 import weatherIcon from '@/assets/weather-icon.svg';
 
@@ -23,7 +23,7 @@ interface WeatherModalProps {
   /** Unit system for temperature display */
   temperatureUnit: UnitSystem;
   /** Unit system for wind speed / precipitation / pressure display */
-  speedUnit: UnitSystem;
+  speedUnit: SpeedUnit;
 }
 
 export function WeatherModal({ isOpen, onClose, lat, lon, startTime, temperatureUnit, speedUnit }: WeatherModalProps) {
@@ -126,12 +126,12 @@ export function WeatherModal({ isOpen, onClose, lat, lon, startTime, temperature
 
           {weather && !loading && !error && (() => {
             const isTempImperial = temperatureUnit === 'imperial';
-            const isSpeedImperial = speedUnit === 'imperial';
+            const isSpeedImperial = isImperialSpeedUnit(speedUnit);
             const locale = useFlightStore.getState().locale;
             const fmtTemp = (c: number) =>
               isTempImperial ? `${fmtNum((c * 9) / 5 + 32, 1, locale)}\u00B0F` : `${fmtNum(c, 1, locale)}\u00B0C`;
             const fmtSpeed = (kmh: number) =>
-              isSpeedImperial ? `${fmtNum(kmh * 0.621371, 1, locale)} mph` : `${fmtNum(kmh, 1, locale)} km/h`;
+              `${fmtNum((kmh / 3.6) * speedMultiplierFromMs(speedUnit), 1, locale)} ${speedUnitLabel(speedUnit)}`;
             const fmtPrecip = (mm: number) =>
               isSpeedImperial ? `${fmtNum(mm * 0.03937, 2, locale)} in` : `${fmtNum(mm, 1, locale)} mm`;
             const fmtPressure = (hPa: number) =>

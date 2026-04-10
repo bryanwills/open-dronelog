@@ -3,21 +3,47 @@
  */
 
 export type UnitSystem = 'metric' | 'imperial';
+export type SpeedUnit = 'kmh' | 'mph' | 'ms' | 'fts';
 
 /** Granular per-measurement-type unit preferences */
 export type UnitPreferences = {
   distance: UnitSystem;
-  speed: UnitSystem;
+  speed: SpeedUnit;
   altitude: UnitSystem;
   temperature: UnitSystem;
 };
 
 export const DEFAULT_UNIT_PREFS: UnitPreferences = {
   distance: 'metric',
-  speed: 'metric',
+  speed: 'kmh',
   altitude: 'metric',
   temperature: 'metric',
 };
+
+export function normalizeSpeedUnit(value: unknown): SpeedUnit {
+  if (value === 'kmh' || value === 'mph' || value === 'ms' || value === 'fts') return value;
+  // Backward compatibility for older stored preferences.
+  if (value === 'imperial') return 'mph';
+  return 'kmh';
+}
+
+export function isImperialSpeedUnit(speedUnit: SpeedUnit): boolean {
+  return speedUnit === 'mph' || speedUnit === 'fts';
+}
+
+export function speedMultiplierFromMs(speedUnit: SpeedUnit): number {
+  if (speedUnit === 'mph') return 2.236936;
+  if (speedUnit === 'kmh') return 3.6;
+  if (speedUnit === 'fts') return 3.28084;
+  return 1;
+}
+
+export function speedUnitLabel(speedUnit: SpeedUnit): string {
+  if (speedUnit === 'mph') return 'mph';
+  if (speedUnit === 'kmh') return 'km/h';
+  if (speedUnit === 'fts') return 'ft/s';
+  return 'm/s';
+}
 
 /** Locale-aware number formatter helper */
 export function fmtNum(value: number, decimals: number, locale?: string): string {
@@ -63,16 +89,12 @@ export function formatDistance(
 /** Format speed from m/s to km/h or mph */
 export function formatSpeed(
   ms: number | null,
-  unitSystem: UnitSystem = 'metric',
+  unitSystem: SpeedUnit = 'kmh',
   locale?: string
 ): string {
   if (ms === null || ms === undefined) return '--';
-  if (unitSystem === 'imperial') {
-    const mph = ms * 2.236936;
-    return `${fmtNum(mph, 1, locale)} mph`;
-  }
-  const kmh = ms * 3.6;
-  return `${fmtNum(kmh, 1, locale)} km/h`;
+  const multiplier = speedMultiplierFromMs(unitSystem);
+  return `${fmtNum(ms * multiplier, 1, locale)} ${speedUnitLabel(unitSystem)}`;
 }
 
 /** Format altitude in meters */

@@ -8,8 +8,8 @@ import { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption, ECharts, LineSeriesOption } from 'echarts';
 import type { TelemetryData } from '@/types';
-import type { UnitSystem, UnitPreferences } from '@/lib/utils';
-import { ensureAmPmUpperCase } from '@/lib/utils';
+import type { UnitSystem, UnitPreferences, SpeedUnit } from '@/lib/utils';
+import { ensureAmPmUpperCase, speedMultiplierFromMs, speedUnitLabel } from '@/lib/utils';
 import { useFlightStore } from '@/stores/flightStore';
 import { useTranslation } from 'react-i18next';
 import ColorPickerModal from '@/components/dashboard/ColorPickerModal';
@@ -92,7 +92,7 @@ function getFieldDef(id: string): TelemetryFieldDef | undefined {
 }
 
 /** Resolve which UnitSystem ('metric'|'imperial') applies to a given field based on granular prefs */
-function resolveUnitForField(field: TelemetryFieldDef, unitPrefs: UnitPreferences): UnitSystem {
+function resolveUnitForField(field: TelemetryFieldDef, unitPrefs: UnitPreferences): UnitSystem | SpeedUnit {
   switch (field.group) {
     case 'altitude': return unitPrefs.altitude;
     case 'speed':
@@ -113,7 +113,7 @@ function resolveUnitForField(field: TelemetryFieldDef, unitPrefs: UnitPreference
 function getFieldData(
   fieldId: string,
   data: TelemetryData,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem | SpeedUnit
 ): (number | null)[] {
   const field = getFieldDef(fieldId);
   if (!field) return [];
@@ -169,9 +169,9 @@ function getFieldData(
   if (!rawData || !Array.isArray(rawData)) return [];
 
   // Apply unit conversion
-  const factor = unitSystem === 'imperial'
-    ? (field.imperialFactor ?? 1)
-    : (field.metricFactor ?? 1);
+  const factor = field.group === 'speed' || field.group === 'velocity'
+    ? speedMultiplierFromMs(unitSystem as SpeedUnit)
+    : (unitSystem === 'imperial' ? (field.imperialFactor ?? 1) : (field.metricFactor ?? 1));
 
   return (rawData as (number | null)[]).map(v =>
     v === null || v === undefined ? null : v * factor
@@ -179,9 +179,12 @@ function getFieldData(
 }
 
 /** Get the unit string for a field based on unit system */
-function getFieldUnit(fieldId: string, unitSystem: UnitSystem): string {
+function getFieldUnit(fieldId: string, unitSystem: UnitSystem | SpeedUnit): string {
   const field = getFieldDef(fieldId);
   if (!field) return '';
+  if (field.group === 'speed' || field.group === 'velocity') {
+    return speedUnitLabel(unitSystem as SpeedUnit);
+  }
   return unitSystem === 'imperial' && field.unitImperial ? field.unitImperial : field.unit;
 }
 
@@ -192,6 +195,8 @@ function getUnitCategoryLabel(unit: string, t: TFn): string {
     'ft': t('telemetry.distanceFt'),
     'km/h': t('telemetry.speedKmh'),
     'mph': t('telemetry.speedMph'),
+    'm/s': 'Speed (m/s)',
+    'ft/s': 'Speed (ft/s)',
     '°': 'Degrees (°)',
     '%': 'Percent (%)',
     'V': t('telemetry.cellVoltageV'),
@@ -1527,9 +1532,7 @@ function createAltitudeSpeedChart(
       ? data.vpsHeight.map((val) => (val === null ? null : val * 3.28084))
       : data.vpsHeight;
   const speedSeries =
-    unitPrefs.speed === 'imperial'
-      ? data.speed.map((val) => (val === null ? null : val * 2.236936))
-      : data.speed.map((val) => (val === null ? null : val * 3.6));
+    data.speed.map((val) => (val === null ? null : val * speedMultiplierFromMs(unitPrefs.speed)));
   const heightRange = computeRange([
     ...heightSeries,
     ...vpsHeightSeries,
@@ -1577,7 +1580,12 @@ function createAltitudeSpeedChart(
       },
       {
         type: 'value',
-        name: unitPrefs.speed === 'imperial' ? t('telemetry.speedMph') : t('telemetry.speedKmh'),
+        name: (() => {
+          if (unitPrefs.speed === 'mph') return t('telemetry.speedMph');
+          if (unitPrefs.speed === 'kmh') return t('telemetry.speedKmh');
+          if (unitPrefs.speed === 'fts') return 'Speed (ft/s)';
+          return 'Speed (m/s)';
+        })(),
         min: speedRange.min,
         max: speedRange.max,
         nameTextStyle: {
@@ -2308,7 +2316,7 @@ function createDistanceToHomeChart(
 
 function createVelocityChart(
   data: TelemetryData,
-  unitSystem: UnitSystem,
+  unitSystem: SpeedUnit,
   splitLineColor: string,
   tooltipFormatter: TooltipFormatter,
   tooltipColors: TooltipColors,
@@ -2317,7 +2325,7 @@ function createVelocityChart(
   const velocityX = data.velocityX ?? [];
   const velocityY = data.velocityY ?? [];
   const velocityZ = data.velocityZ ?? [];
-  const speedSeriesFactor = unitSystem === 'imperial' ? 2.236936 : 3.6;
+  const speedSeriesFactor = speedMultiplierFromMs(unitSystem);
   const xSeries = velocityX.map((val) => (val === null || val === undefined ? null : val * speedSeriesFactor));
   const ySeries = velocityY.map((val) => (val === null || val === undefined ? null : val * speedSeriesFactor));
   const zSeries = velocityZ.map((val) => (val === null || val === undefined ? null : val * speedSeriesFactor));
@@ -2341,7 +2349,13 @@ function createVelocityChart(
     },
     yAxis: {
       type: 'value',
-      name: unitSystem === 'imperial' ? t('telemetry.speedMph') : t('telemetry.speedKmh'),
+      name: unitSystem === 'mph'
+        ? t('telemetry.speedMph')
+        : unitSystem === 'kmh'
+          ? t('telemetry.speedKmh')
+          : unitSystem === 'fts'
+            ? 'Speed (ft/s)'
+            : 'Speed (m/s)',
       min: speedRange.min,
       max: speedRange.max,
       axisLine: {

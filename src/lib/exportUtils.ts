@@ -5,6 +5,7 @@
 
 import type { FlightDataResponse, TelemetryData } from '@/types';
 import type { UnitPreferences } from './utils';
+import { speedMultiplierFromMs } from './utils';
 
 declare const __APP_VERSION__: string;
 
@@ -81,12 +82,13 @@ export function buildCsv(data: FlightDataResponse, unitPrefs?: UnitPreferences):
 
   const isDistImp = unitPrefs?.distance === 'imperial';
   const isAltImp = unitPrefs?.altitude === 'imperial';
-  const isSpeedImp = unitPrefs?.speed === 'imperial';
+  const speedUnit = unitPrefs?.speed ?? 'kmh';
   const isTempImp = unitPrefs?.temperature === 'imperial';
 
   const mToFt = 3.28084;
-  const msToMph = 2.236936;
+  const msToSpeed = speedMultiplierFromMs(speedUnit);
   const cToF = (c: number) => c * 9/5 + 32;
+  const speedHeaderSuffix = speedUnit === 'mph' ? 'mph' : speedUnit === 'kmh' ? 'kmh' : speedUnit === 'fts' ? 'fts' : 'ms';
 
   // Build metadata JSON for the first row's metadata column
   const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown';
@@ -144,10 +146,10 @@ export function buildCsv(data: FlightDataResponse, unitPrefs?: UnitPreferences):
     isAltImp ? 'height_ft' : 'height_m',
     isAltImp ? 'vps_height_ft' : 'vps_height_m',
     isAltImp ? 'altitude_ft' : 'altitude_m',
-    isSpeedImp ? 'speed_mph' : 'speed_ms',
-    isSpeedImp ? 'velocity_x_mph' : 'velocity_x_ms',
-    isSpeedImp ? 'velocity_y_mph' : 'velocity_y_ms',
-    isSpeedImp ? 'velocity_z_mph' : 'velocity_z_ms',
+    `speed_${speedHeaderSuffix}`,
+    `velocity_x_${speedHeaderSuffix}`,
+    `velocity_y_${speedHeaderSuffix}`,
+    `velocity_z_${speedHeaderSuffix}`,
     'battery_percent',
     'battery_voltage_v',
     isTempImp ? 'battery_temp_f' : 'battery_temp_c',
@@ -278,10 +280,10 @@ export function buildCsv(data: FlightDataResponse, unitPrefs?: UnitPreferences):
       getMetric(telemetry.height, index, 2, isAltImp ? mToFt : 1),         // height_m
       getMetric(telemetry.vpsHeight, index, 2, isAltImp ? mToFt : 1),      // vps_height_m
       getMetric(telemetry.altitude, index, 2, isAltImp ? mToFt : 1),       // altitude_m
-      getMetric(telemetry.speed, index, 2, isSpeedImp ? msToMph : 1),          // speed_ms
-      getMetric(telemetry.velocityX, index, 2, isSpeedImp ? msToMph : 1),      // velocity_x_ms
-      getMetric(telemetry.velocityY, index, 2, isSpeedImp ? msToMph : 1),      // velocity_y_ms
-      getMetric(telemetry.velocityZ, index, 2, isSpeedImp ? msToMph : 1),      // velocity_z_ms
+      getMetric(telemetry.speed, index, 2, msToSpeed),          // speed_<unit>
+      getMetric(telemetry.velocityX, index, 2, msToSpeed),      // velocity_x_<unit>
+      getMetric(telemetry.velocityY, index, 2, msToSpeed),      // velocity_y_<unit>
+      getMetric(telemetry.velocityZ, index, 2, msToSpeed),      // velocity_z_<unit>
       getValue(telemetry.battery, index),            // battery_percent (integer)
       getMetric(telemetry.batteryVoltage, index, 3, 1), // battery_voltage_v
       formatNum(!isTempImp ? telemetry.batteryTemp?.[index] : (telemetry.batteryTemp?.[index] != null ? cToF(telemetry.batteryTemp[index]!) : null), 1),    // battery_temp_c
@@ -321,11 +323,11 @@ export function buildCsv(data: FlightDataResponse, unitPrefs?: UnitPreferences):
 export function buildJson(data: FlightDataResponse, unitPrefs?: UnitPreferences): string {
   const isDistImp = unitPrefs?.distance === 'imperial';
   const isAltImp = unitPrefs?.altitude === 'imperial';
-  const isSpeedImp = unitPrefs?.speed === 'imperial';
+  const speedUnit = unitPrefs?.speed ?? 'kmh';
   const isTempImp = unitPrefs?.temperature === 'imperial';
 
   const mToFt = 3.28084;
-  const msToMph = 2.236936;
+  const msToSpeed = speedMultiplierFromMs(speedUnit);
   const cToF = (c: number) => c * 9/5 + 32;
 
   const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown';
@@ -338,7 +340,7 @@ export function buildJson(data: FlightDataResponse, unitPrefs?: UnitPreferences)
   // Convert flight metadata if needed
   if (isDistImp && flight.totalDistance != null) flight.totalDistance *= mToFt;
   if (isAltImp && flight.maxAltitude != null) flight.maxAltitude *= mToFt;
-  if (isSpeedImp && flight.maxSpeed != null) flight.maxSpeed *= msToMph;
+  if (flight.maxSpeed != null) flight.maxSpeed *= msToSpeed;
 
   // Convert telemetry arrays if needed
   if (isAltImp) {
@@ -350,12 +352,10 @@ export function buildJson(data: FlightDataResponse, unitPrefs?: UnitPreferences)
     }
   }
   
-  if (isSpeedImp) {
-    if (telemetry.speed) telemetry.speed = telemetry.speed.map(v => v != null ? v * msToMph : null);
-    if (telemetry.velocityX) telemetry.velocityX = telemetry.velocityX.map(v => v != null ? v * msToMph : null);
-    if (telemetry.velocityY) telemetry.velocityY = telemetry.velocityY.map(v => v != null ? v * msToMph : null);
-    if (telemetry.velocityZ) telemetry.velocityZ = telemetry.velocityZ.map(v => v != null ? v * msToMph : null);
-  }
+  if (telemetry.speed) telemetry.speed = telemetry.speed.map(v => v != null ? v * msToSpeed : null);
+  if (telemetry.velocityX) telemetry.velocityX = telemetry.velocityX.map(v => v != null ? v * msToSpeed : null);
+  if (telemetry.velocityY) telemetry.velocityY = telemetry.velocityY.map(v => v != null ? v * msToSpeed : null);
+  if (telemetry.velocityZ) telemetry.velocityZ = telemetry.velocityZ.map(v => v != null ? v * msToSpeed : null);
   
   if (isTempImp) {
     if (telemetry.batteryTemp) telemetry.batteryTemp = telemetry.batteryTemp.map(v => v != null ? cToF(v) : null);

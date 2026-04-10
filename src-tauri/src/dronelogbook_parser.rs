@@ -265,7 +265,30 @@ impl<'a> DroneLogbookParser<'a> {
         // Detect units from headers
         let mut _is_dist_imp = headers.iter().any(|h| h.to_lowercase() == "distance_to_home_ft");
         let mut is_alt_imp = headers.iter().any(|h| h.to_lowercase() == "alt_ft");
-        let mut is_speed_imp = headers.iter().any(|h| h.to_lowercase() == "speed_mph");
+        let mut speed_col = "speed_ms";
+        let mut velocity_x_col = "velocity_x_ms";
+        let mut velocity_y_col = "velocity_y_ms";
+        let mut velocity_z_col = "velocity_z_ms";
+        let mut speed_to_ms = 1.0_f64;
+        if headers.iter().any(|h| h.to_lowercase() == "speed_mph") {
+            speed_col = "speed_mph";
+            velocity_x_col = "velocity_x_mph";
+            velocity_y_col = "velocity_y_mph";
+            velocity_z_col = "velocity_z_mph";
+            speed_to_ms = 1.0 / 2.236936;
+        } else if headers.iter().any(|h| h.to_lowercase() == "speed_kmh") {
+            speed_col = "speed_kmh";
+            velocity_x_col = "velocity_x_kmh";
+            velocity_y_col = "velocity_y_kmh";
+            velocity_z_col = "velocity_z_kmh";
+            speed_to_ms = 1.0 / 3.6;
+        } else if headers.iter().any(|h| h.to_lowercase() == "speed_fts") {
+            speed_col = "speed_fts";
+            velocity_x_col = "velocity_x_fts";
+            velocity_y_col = "velocity_y_fts";
+            velocity_z_col = "velocity_z_fts";
+            speed_to_ms = 1.0 / 3.28084;
+        }
         let mut is_temp_imp = headers.iter().any(|h| h.to_lowercase() == "battery_temp_f");
 
         // Parse first data row to extract metadata JSON and messages from their columns
@@ -330,7 +353,41 @@ impl<'a> DroneLogbookParser<'a> {
                                                     is_alt_imp = alt == "imperial";
                                                 }
                                                 if let Some(speed) = units_obj.get("speed").and_then(|v| v.as_str()) {
-                                                    is_speed_imp = speed == "imperial";
+                                                    let normalized = match speed {
+                                                        "imperial" => "mph",
+                                                        "metric" => "kmh",
+                                                        _ => speed,
+                                                    };
+                                                    match normalized {
+                                                        "mph" => {
+                                                            speed_col = "speed_mph";
+                                                            velocity_x_col = "velocity_x_mph";
+                                                            velocity_y_col = "velocity_y_mph";
+                                                            velocity_z_col = "velocity_z_mph";
+                                                            speed_to_ms = 1.0 / 2.236936;
+                                                        }
+                                                        "kmh" => {
+                                                            speed_col = "speed_kmh";
+                                                            velocity_x_col = "velocity_x_kmh";
+                                                            velocity_y_col = "velocity_y_kmh";
+                                                            velocity_z_col = "velocity_z_kmh";
+                                                            speed_to_ms = 1.0 / 3.6;
+                                                        }
+                                                        "fts" => {
+                                                            speed_col = "speed_fts";
+                                                            velocity_x_col = "velocity_x_fts";
+                                                            velocity_y_col = "velocity_y_fts";
+                                                            velocity_z_col = "velocity_z_fts";
+                                                            speed_to_ms = 1.0 / 3.28084;
+                                                        }
+                                                        _ => {
+                                                            speed_col = "speed_ms";
+                                                            velocity_x_col = "velocity_x_ms";
+                                                            velocity_y_col = "velocity_y_ms";
+                                                            velocity_z_col = "velocity_z_ms";
+                                                            speed_to_ms = 1.0;
+                                                        }
+                                                    }
                                                 }
                                                 if let Some(temp) = units_obj.get("temperature").and_then(|v| v.as_str()) {
                                                     is_temp_imp = temp == "imperial";
@@ -477,8 +534,8 @@ impl<'a> DroneLogbookParser<'a> {
             }
 
             // Track max speed and altitude
-            if let Some(speed_raw) = col_map.get_f64(fields, if is_speed_imp { "speed_mph" } else { "speed_ms" }) {
-                let speed = if is_speed_imp { speed_raw / 2.236936 } else { speed_raw };
+            if let Some(speed_raw) = col_map.get_f64(fields, speed_col) {
+                let speed = speed_raw * speed_to_ms;
                 if speed > *max_speed {
                     *max_speed = speed;
                 }
@@ -515,20 +572,20 @@ impl<'a> DroneLogbookParser<'a> {
 
                 // Velocity
                 speed: {
-                    let s = col_map.get_f64(fields, if is_speed_imp { "speed_mph" } else { "speed_ms" });
-                    if is_speed_imp { s.map(|v| v / 2.236936) } else { s }
+                    let s = col_map.get_f64(fields, speed_col);
+                    s.map(|v| v * speed_to_ms)
                 },
                 velocity_x: {
-                    let vx = col_map.get_f64(fields, if is_speed_imp { "velocity_x_mph" } else { "velocity_x_ms" });
-                    if is_speed_imp { vx.map(|v| v / 2.236936) } else { vx }
+                    let vx = col_map.get_f64(fields, velocity_x_col);
+                    vx.map(|v| v * speed_to_ms)
                 },
                 velocity_y: {
-                    let vy = col_map.get_f64(fields, if is_speed_imp { "velocity_y_mph" } else { "velocity_y_ms" });
-                    if is_speed_imp { vy.map(|v| v / 2.236936) } else { vy }
+                    let vy = col_map.get_f64(fields, velocity_y_col);
+                    vy.map(|v| v * speed_to_ms)
                 },
                 velocity_z: {
-                    let vz = col_map.get_f64(fields, if is_speed_imp { "velocity_z_mph" } else { "velocity_z_ms" });
-                    if is_speed_imp { vz.map(|v| v / 2.236936) } else { vz }
+                    let vz = col_map.get_f64(fields, velocity_z_col);
+                    vz.map(|v| v * speed_to_ms)
                 },
 
                 // Orientation

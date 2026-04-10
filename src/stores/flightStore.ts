@@ -6,7 +6,15 @@
 import { create } from 'zustand';
 import * as api from '@/lib/api';
 import type { Flight, FlightDataResponse, FlightMessage, ImportResult, OverviewStats } from '@/types';
-import { normalizeSerial, LEGACY_DATE_LOCALE_MAP, type UnitPreferences, DEFAULT_UNIT_PREFS } from '@/lib/utils';
+import {
+  normalizeSerial,
+  LEGACY_DATE_LOCALE_MAP,
+  type UnitPreferences,
+  type UnitSystem,
+  type SpeedUnit,
+  DEFAULT_UNIT_PREFS,
+  normalizeSpeedUnit,
+} from '@/lib/utils';
 import i18n from '@/i18n';
 
 /**
@@ -116,7 +124,7 @@ interface FlightState {
   setAppLanguage: (lang: string) => void;
   timeFormat: '12h' | '24h';
   setTimeFormat: (format: '12h' | '24h') => void;
-  setUnitPref: (key: keyof UnitPreferences, value: 'metric' | 'imperial') => void;
+  setUnitPref: (key: keyof UnitPreferences, value: UnitSystem | SpeedUnit) => void;
   setThemeMode: (themeMode: 'system' | 'dark' | 'light') => void;
   setDonationAcknowledged: (value: boolean) => void;
   setSupporterBadge: (active: boolean) => void;
@@ -246,12 +254,26 @@ export const useFlightStore = create<FlightState>((set, get) => ({
     // Try new granular key first
     const stored = localStorage.getItem('unitPrefs');
     if (stored) {
-      try { return { ...DEFAULT_UNIT_PREFS, ...JSON.parse(stored) }; } catch { /* fall through */ }
+      try {
+        const parsed = JSON.parse(stored);
+        return {
+          ...DEFAULT_UNIT_PREFS,
+          ...parsed,
+          speed: normalizeSpeedUnit(parsed?.speed),
+        };
+      } catch {
+        /* fall through */
+      }
     }
     // Migrate from legacy unitSystem key
     const legacy = localStorage.getItem('unitSystem') as 'metric' | 'imperial' | null;
     if (legacy) {
-      const migrated: UnitPreferences = { distance: legacy, speed: legacy, altitude: legacy, temperature: legacy };
+      const migrated: UnitPreferences = {
+        distance: legacy,
+        speed: legacy === 'imperial' ? 'mph' : 'kmh',
+        altitude: legacy,
+        temperature: legacy,
+      };
       localStorage.setItem('unitPrefs', JSON.stringify(migrated));
       localStorage.removeItem('unitSystem');
       return migrated;
@@ -881,7 +903,10 @@ export const useFlightStore = create<FlightState>((set, get) => ({
   },
 
   setUnitPref: (key, value) => {
-    const updated = { ...get().unitPrefs, [key]: value };
+    const updated = {
+      ...get().unitPrefs,
+      [key]: key === 'speed' ? normalizeSpeedUnit(value) : value,
+    } as UnitPreferences;
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('unitPrefs', JSON.stringify(updated));
     }
