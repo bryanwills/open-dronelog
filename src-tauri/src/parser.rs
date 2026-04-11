@@ -43,6 +43,10 @@ const MAX_GPS_JUMP_SPEED_MPS: f64 = 120.0;
 const MAX_DISTANCE_FROM_HOME_M: f64 = 50_000.0;
 /// Hard cap for plausible jump distance between consecutive accepted GPS points.
 const MAX_GPS_STEP_DISTANCE_M: f64 = 50000.0;
+/// Drop a frame if fly_time changes by more than 5 seconds from the previous accepted frame.
+const MAX_FLY_TIME_JUMP_MS: i64 = 5_000;
+/// Pack battery voltage above this is considered invalid for these DJI logs.
+const MAX_BATTERY_VOLTAGE_V: f64 = 30.0;
 
 /// Full-length serial numbers extracted from ComponentSerial records.
 /// The details header in DJI logs truncates serials to 16 bytes, but
@@ -933,10 +937,13 @@ impl<'a> LogParser<'a> {
     fn extract_telemetry(&self, frames: &[Frame], details_total_time_secs: f64) -> Vec<TelemetryPoint> {
         let mut points = Vec::with_capacity(frames.len());
         let mut timestamp_ms: i64 = 0;
+        let mut prev_fly_time_ms: Option<i64> = None;
         let mut home_gps: Option<(f64, f64)> = None;
         let mut prev_valid_gps: Option<(f64, f64, i64)> = None;
 
         // Counters for logging
+        let mut skipped_fly_time_jump: usize = 0;
+        let mut adjusted_fly_time_jump: usize = 0;
         let mut skipped_corrupt: usize = 0;
         let mut skipped_no_gps: usize = 0;
         let mut skipped_out_of_range: usize = 0;
@@ -944,6 +951,7 @@ impl<'a> LogParser<'a> {
         let mut skipped_far_from_home: usize = 0;
         let mut skipped_alt_clamp: usize = 0;
         let mut skipped_speed_clamp: usize = 0;
+        let mut skipped_battery_voltage_clamp: usize = 0;
 
         // Check if any frame has a non-zero fly_time
         let has_fly_time = frames.iter().any(|f| f.osd.fly_time > 0.0);
@@ -976,12 +984,59 @@ impl<'a> LogParser<'a> {
             } else {
                 0
             };
-            // Use fly_time when it advances past our counter, otherwise keep incrementing
-            let current_timestamp_ms = if fly_time_ms > timestamp_ms {
-                fly_time_ms
-            } else {
-                timestamp_ms
-            };
+
+            if fly_time_ms > 0 {
+                if let Some(prev_ms) = prev_fly_time_ms {
+                    let delta_ms = fly_time_ms - prev_ms;
+                    // Only treat large forward leaps as suspicious.
+                    if delta_ms > MAX_FLY_TIME_JUMP_MS {
+                        // Classify as true poison only when time jump is paired with
+                        // impossible telemetry values.
+                        let gps_invalid = !is_finite_f64(osd.latitude)
+                            || !is_finite_f64(osd.longitude)
+                            || osd.latitude.abs() > 90.0
+                            || osd.longitude.abs() > 180.0;
+                        let sat_invalid = osd.gps_num > 80;
+                        let batt_invalid = battery.charge_level > 100;
+
+                        if gps_invalid || sat_invalid || batt_invalid {
+                            skipped_fly_time_jump += 1;
+                            if skipped_fly_time_jump <= 5 {
+                                log::warn!(
+                                    "Skipping timeline-poison frame at fly_time={}ms (prev={}ms, delta={}ms)",
+                                    fly_time_ms,
+                                    prev_ms,
+                                    delta_ms
+                                );
+                            }
+                            // Preserve periodic timeline by inserting an empty placeholder row
+                            // at this tick for dropped poison frames.
+                            points.push(TelemetryPoint {
+                                timestamp_ms,
+                                ..Default::default()
+                            });
+                            timestamp_ms = timestamp_ms + fallback_interval_ms;
+                            continue;
+                        } else {
+                            adjusted_fly_time_jump += 1;
+                            if adjusted_fly_time_jump <= 5 {
+                                log::debug!(
+                                    "Adjusting large fly_time jump at fly_time={}ms (prev={}ms, delta={}ms) and keeping plausible frame",
+                                    fly_time_ms,
+                                    prev_ms,
+                                    delta_ms
+                                );
+                            }
+                        }
+                    }
+                }
+                prev_fly_time_ms = Some(fly_time_ms);
+            }
+
+            // Keep telemetry time periodic based on inferred frame cadence.
+            // We intentionally do not anchor to raw fly_time to avoid timeline gaps
+            // from sparse/corrupt fly_time updates in some enterprise logs.
+            let current_timestamp_ms = timestamp_ms;
 
             // Validate core numeric fields — skip entire frame if data is corrupt
             // (e.g. the parser produced garbage like lat=-6.6e-136, lon=5.7e+139)
@@ -1003,6 +1058,12 @@ impl<'a> LogParser<'a> {
                     );
                 }
                 skipped_corrupt += 1;
+                // Preserve periodic timeline by inserting an empty placeholder row
+                // for corrupt frames.
+                points.push(TelemetryPoint {
+                    timestamp_ms: current_timestamp_ms,
+                    ..Default::default()
+                });
                 timestamp_ms = current_timestamp_ms + fallback_interval_ms;
                 continue;
             }
@@ -1097,8 +1158,18 @@ impl<'a> LogParser<'a> {
             point.gimbal_roll = Some(gimbal.roll as f64);
             point.gimbal_yaw = Some(gimbal.yaw as f64);
 
-            point.battery_percent = Some(battery.charge_level as i32);
-            point.battery_voltage = Some(battery.voltage as f64);
+            point.battery_percent = if battery.charge_level <= 100 {
+                Some(battery.charge_level as i32)
+            } else {
+                None
+            };
+            let batt_v = battery.voltage as f64;
+            point.battery_voltage = if batt_v.is_finite() && batt_v > 0.0 && batt_v <= MAX_BATTERY_VOLTAGE_V {
+                Some(batt_v)
+            } else {
+                skipped_battery_voltage_clamp += 1;
+                None
+            };
             point.battery_current = Some(battery.current as f64);
             point.battery_temp = Some(battery.temperature as f64);
             // Extract battery capacity telemetry
@@ -1112,7 +1183,12 @@ impl<'a> LogParser<'a> {
             }
             // Extract individual cell voltages if available
             point.cell_voltages = if !battery.cell_voltages.is_empty() {
-                Some(battery.cell_voltages.iter().map(|v| *v as f64).collect())
+                let volts: Vec<f64> = battery.cell_voltages.iter().map(|v| *v as f64).collect();
+                if volts.iter().any(|v| *v > 30.0) {
+                    None
+                } else {
+                    Some(volts)
+                }
             } else {
                 None
             };
@@ -1146,22 +1222,28 @@ impl<'a> LogParser<'a> {
         }
 
         // Log extraction summary
-        if skipped_corrupt > 0
+        if skipped_fly_time_jump > 0
+            || adjusted_fly_time_jump > 0
+            || skipped_corrupt > 0
             || skipped_out_of_range > 0
             || skipped_jump > 0
             || skipped_far_from_home > 0
             || skipped_alt_clamp > 0
             || skipped_speed_clamp > 0
+            || skipped_battery_voltage_clamp > 0
         {
             log::warn!(
-                "Telemetry filtering: {} corrupt frames skipped, {} GPS out-of-range, {} jump outliers skipped, {} >50km-home skipped, {} no-GPS-lock, {} altitude clamped, {} speed clamped",
+                "Telemetry filtering: {} fly_time poison frames skipped, {} large fly_time jumps adjusted, {} corrupt frames skipped, {} GPS out-of-range, {} jump outliers skipped, {} >50km-home skipped, {} no-GPS-lock, {} altitude clamped, {} speed clamped, {} battery_voltage clamped",
+                skipped_fly_time_jump,
+                adjusted_fly_time_jump,
                 skipped_corrupt,
                 skipped_out_of_range,
                 skipped_jump,
                 skipped_far_from_home,
                 skipped_no_gps,
                 skipped_alt_clamp,
-                skipped_speed_clamp
+                skipped_speed_clamp,
+                skipped_battery_voltage_clamp
             );
         } else {
             log::debug!(
@@ -1378,11 +1460,9 @@ impl<'a> LogParser<'a> {
         }
 
         for frame in frames {
-            let current_timestamp_ms = if frame.osd.fly_time > 0.0 {
-                (frame.osd.fly_time * 1000.0) as i64
-            } else {
-                timestamp_ms
-            };
+            // Keep message timestamps aligned to telemetry's periodic cadence.
+            // This avoids drift when raw fly_time is sparse or corrupted.
+            let current_timestamp_ms = timestamp_ms;
 
             // Extract tip message if present
             if !frame.app.tip.is_empty() {
