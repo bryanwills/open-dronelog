@@ -117,6 +117,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [badgeCode, setBadgeCode] = useState('');
   const [badgeMessage, setBadgeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [unitsDropdownOpen, setUnitsDropdownOpen] = useState(false);
+  const canEditApiKey = activeProfile === 'default';
 
   useEffect(() => {
     if (webMode) return;
@@ -527,6 +528,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   const handleSave = async () => {
+    if (!canEditApiKey) {
+      setMessage({ type: 'error', text: t('settings.apiKeyDefaultProfileOnlyTitle') });
+      return;
+    }
+
     if (!apiKey.trim()) {
       setMessage({ type: 'error', text: t('settings.enterApiKey') });
       return;
@@ -1365,45 +1371,62 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       {t('settings.default')}
                     </span>
                   )}
-                  {apiKeyType === 'personal' && (
+                  {apiKeyType === 'personal' && canEditApiKey && (
                     <button
                       onClick={async () => {
                         try {
                           await api.removeApiKey();
                           await checkApiKey();
                           await loadApiKeyType(); // Update global store
-                          setMessage({ type: 'success', text: 'Custom API key removed. Using default key.' });
+                          setMessage({ type: 'success', text: t('settings.customApiKeyRemoved') });
                         } catch (err) {
-                          setMessage({ type: 'error', text: `Failed to remove key: ${err}` });
+                          setMessage({ type: 'error', text: `${t('settings.failedToRemoveKey')}: ${err}` });
                         }
                       }}
                       className="api-key-badge api-key-badge-personal group inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full cursor-pointer transition-all duration-150 hover:api-key-badge-remove"
-                      title="Click to remove custom key and use default"
+                      title={t('settings.apiKeyRemoveTitle')}
                     >
                       <svg className="w-3 h-3 group-hover:hidden" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 110 14A7 7 0 018 1zm3.354 4.646a.5.5 0 010 .708l-4 4a.5.5 0 01-.708 0l-2-2a.5.5 0 11.708-.708L7 9.293l3.646-3.647a.5.5 0 01.708 0z" /></svg>
                       <svg className="w-3 h-3 hidden group-hover:block" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 110 14A7 7 0 018 1zm2.854 4.146a.5.5 0 010 .708L8.707 8l2.147 2.146a.5.5 0 01-.708.708L8 8.707l-2.146 2.147a.5.5 0 01-.708-.708L7.293 8 5.146 5.854a.5.5 0 11.708-.708L8 7.293l2.146-2.147a.5.5 0 01.708 0z" /></svg>
                       <span className="group-hover:hidden">{t('settings.personal')}</span>
-                      <span className="hidden group-hover:inline">Remove</span>
+                      <span className="hidden group-hover:inline">{t('settings.apiKeyRemove')}</span>
                     </button>
+                  )}
+                  {apiKeyType === 'personal' && !canEditApiKey && (
+                    <span className="api-key-badge api-key-badge-personal inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                      <svg className="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 110 14A7 7 0 018 1zm3.354 4.646a.5.5 0 010 .708l-4 4a.5.5 0 01-.708 0l-2-2a.5.5 0 11.708-.708L7 9.293l3.646-3.647a.5.5 0 01.708 0z" /></svg>
+                      {t('settings.personal')}
+                    </span>
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  <PasswordInput
-                    wrapperClassName="flex-1 min-w-0"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder={hasKey ? '••••••••••••••••' : 'Enter your DJI API key'}
-                    className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
-                  />
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving || !apiKey.trim()}
-                    className="py-1.5 px-3 rounded-lg bg-drone-primary text-white text-xs hover:bg-drone-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                  >
-                    {isSaving ? t('settings.savingApiKey') : hasKey ? t('settings.updateApiKey') : t('settings.saveApiKey')}
-                  </button>
-                </div>
+                {canEditApiKey ? (
+                  <div className="flex gap-2">
+                    <PasswordInput
+                      wrapperClassName="flex-1 min-w-0"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={hasKey ? '••••••••••••••••' : t('settings.enterYourApiKey')}
+                      className="w-full px-3 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-drone-primary"
+                    />
+                    <button
+                      onClick={handleSave}
+                      disabled={isSaving || !apiKey.trim()}
+                      className="py-1.5 px-3 rounded-lg bg-drone-primary text-white text-xs hover:bg-drone-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      {isSaving ? t('settings.savingApiKey') : hasKey ? t('settings.updateApiKey') : t('settings.saveApiKey')}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2">
+                    <p className="text-xs font-medium text-yellow-200">
+                      {t('settings.apiKeyDefaultProfileOnlyTitle')}
+                    </p>
+                    <p className="mt-1 text-xs text-yellow-100/85">
+                      {t('settings.apiKeyDefaultProfileOnlyDesc', { profile: activeProfile })}
+                    </p>
+                  </div>
+                )}
 
                 {/* Message (auto-dismisses after 5s) */}
                 {message && (

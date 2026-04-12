@@ -853,6 +853,11 @@
 
     #[tauri::command]
     pub async fn set_api_key(api_key: String, state: State<'_, AppState>) -> Result<bool, String> {
+        let active_profile = database::get_active_profile(&state.data_dir);
+        if active_profile != "default" {
+            return Err("Changing DJI API key is only allowed from the default profile".to_string());
+        }
+
         let api = DjiApi::with_app_data_dir(state.data_dir.clone());
         api.save_api_key(&api_key)
             .map(|_| true)
@@ -861,6 +866,11 @@
 
     #[tauri::command]
     pub async fn remove_api_key(state: State<'_, AppState>) -> Result<bool, String> {
+        let active_profile = database::get_active_profile(&state.data_dir);
+        if active_profile != "default" {
+            return Err("Changing DJI API key is only allowed from the default profile".to_string());
+        }
+
         let api = DjiApi::with_app_data_dir(state.data_dir.clone());
         api.remove_api_key()
             .map(|_| true)

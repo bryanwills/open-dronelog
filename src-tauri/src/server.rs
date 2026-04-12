@@ -834,9 +834,16 @@ struct SetApiKeyPayload {
 
 async fn set_api_key(
     AxumState(state): AxumState<WebAppState>,
-    _pdb: ProfileDb,
+    pdb: ProfileDb,
     Json(payload): Json<SetApiKeyPayload>,
 ) -> Result<Json<bool>, (StatusCode, Json<ErrorResponse>)> {
+    if pdb.profile != "default" {
+        return Err(err_response(
+            StatusCode::FORBIDDEN,
+            "Changing DJI API key is only allowed from the default profile",
+        ));
+    }
+
     let api = DjiApi::with_app_data_dir(state.data_dir.clone());
     api.save_api_key(&payload.api_key)
         .map(|_| Json(true))
@@ -846,8 +853,15 @@ async fn set_api_key(
 /// DELETE /api/remove_api_key — Remove the custom API key (fall back to default)
 async fn remove_api_key(
     AxumState(state): AxumState<WebAppState>,
-    _pdb: ProfileDb,
+    pdb: ProfileDb,
 ) -> Result<Json<bool>, (StatusCode, Json<ErrorResponse>)> {
+    if pdb.profile != "default" {
+        return Err(err_response(
+            StatusCode::FORBIDDEN,
+            "Changing DJI API key is only allowed from the default profile",
+        ));
+    }
+
     let api = DjiApi::with_app_data_dir(state.data_dir.clone());
     api.remove_api_key()
         .map(|_| Json(true))
