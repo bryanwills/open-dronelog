@@ -1,7 +1,7 @@
 {
-  "sourceFingerprint": "c070fb3afad61a672ff05e089f8723a91a6ae8a0ab20a8c6c60339e156a3b71d",
+  "sourceFingerprint": "54abbcec1618f6c5f0d1c085cde559e632255eaabbcb051fc1247abdd23ea121",
   "packageName": "open-dronelog",
-  "projectVersion": "3.2.1",
+  "projectVersion": "3.2.2",
   "dependencies": [
     "@deck.gl/layers",
     "@deck.gl/mapbox",
