@@ -4353,35 +4353,9 @@ export function FlightList({
           <div className="my-1 border-t border-gray-700" />
 
           {/* Export submenu */}
-          <div
-            className="relative"
-            onMouseEnter={() => setContextExportSubmenuOpen(true)}
-            onMouseLeave={() => setContextExportSubmenuOpen(false)}
-          >
-            <button
-              type="button"
-              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700/50 flex items-center justify-between"
-            >
-              <span className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                {t('flightList.export')}
-              </span>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-
-            {/* Export submenu */}
+          <div className="relative">
             {contextExportSubmenuOpen && (
-              <div
-                className="absolute left-full bottom-0 ml-1 min-w-[120px] py-1 rounded-lg border border-gray-700 bg-drone-surface shadow-xl"
-                style={{
-                  // Flip to left side if not enough space on right
-                  ...(contextMenu.x + 320 > contextMenu.boundsRight ? { left: 'auto', right: '100%', marginLeft: 0, marginRight: '4px' } : {}),
-                }}
-              >
+              <div className="absolute left-2 right-2 bottom-full mb-1 py-1 rounded-lg border border-gray-700 bg-drone-surface/95 backdrop-blur-sm shadow-xl z-10">
                 <button
                   type="button"
                   onClick={() => handleContextExport(contextMenu.flightId, 'csv')}
@@ -4412,6 +4386,25 @@ export function FlightList({
                 </button>
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => setContextExportSubmenuOpen((open) => !open)}
+              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700/50 flex items-center justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                {t('flightList.export')}
+              </span>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {contextExportSubmenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 15l6-6 6 6" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 9l6 6 6-6" />
+                )}
+              </svg>
+            </button>
           </div>
         </div>
       )}
