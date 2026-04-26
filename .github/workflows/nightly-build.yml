@@ -105,7 +105,7 @@ jobs:
             **This is not a stable release** - it may contain bugs or incomplete features.
           prerelease: true
           includeRelease: true
-          uploadPlainBinary: true
+          uploadPlainBinary: false
           assetNamePattern: 'open-dronelog_nightly_[platform]_[arch][_setup][ext]'
 
   rename-and-checksums:
@@ -154,6 +154,11 @@ jobs:
             newname="${f//$VERSION/nightly}"
             # RPM uses dash before version (e.g., -2.24.0-1) → -nightly-1
             newname="${newname//-$VERSION/-nightly}"
+            # Canonicalize historical naming variants to one release naming scheme.
+            newname="${newname//Open.DroneLog/open-dronelog}"
+            newname="${newname//Open_DroneLog/open-dronelog}"
+            newname="${newname//Open-DroneLog/open-dronelog}"
+            newname="${newname//opendronelog/open-dronelog}"
             if [ "$newname" != "$f" ]; then
               echo "Renaming: $f → $newname"
               mv "$f" "$newname"
@@ -162,19 +167,17 @@ jobs:
           echo "Final assets:"
           ls -la
 
-      - name: Delete old versioned assets from release
+      - name: Delete existing nightly assets from release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
           gh release view "nightly" \
             --repo "${{ github.repository }}" \
             --json assets -q '.assets[].name' | while read -r name; do
-              if echo "$name" | grep -qF "$VERSION"; then
-                echo "Deleting old asset: $name"
-                gh release delete-asset "nightly" "$name" \
-                  --repo "${{ github.repository }}" --yes
-              fi
+              [ -z "$name" ] && continue
+              echo "Deleting existing asset: $name"
+              gh release delete-asset "nightly" "$name" \
+                --repo "${{ github.repository }}" --yes
           done
 
       - name: Upload renamed assets
