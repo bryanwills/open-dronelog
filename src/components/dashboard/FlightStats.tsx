@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { isWebMode, downloadFile, getFlightData, saveTextWithDialog } from '@/lib/api';
 import { buildCsv, buildJson, buildGpx, buildKml, buildKmlRelative } from '@/lib/exportUtils';
 import { useMemo, useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { WeatherModal } from './WeatherModal';
 import { HtmlReportModal } from './HtmlReportModal';
 import weatherIcon from '@/assets/weather-icon.svg';
@@ -35,7 +34,6 @@ export function FlightStats({ data }: FlightStatsProps) {
   const { unitPrefs, locale, dateLocale, appLanguage, getBatteryDisplayName, getDroneDisplayName, addTag, removeTag, allTags, getDisplaySerial, timeFormat } = useFlightStore();
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState({ done: 0, total: 0, currentFile: '' });
   const [showHtmlReportModal, setShowHtmlReportModal] = useState(false);
   const [isWeatherOpen, setIsWeatherOpen] = useState(false);
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -127,12 +125,8 @@ export function FlightStats({ data }: FlightStatsProps) {
         .replace(/^_+|_+$/g, '')
         .slice(0, 80);
 
-      setExportProgress({ done: 0, total: 1, currentFile: `Processing ${baseName}` });
-
       // Fetch full-resolution data for export (display data is downsampled to ~5000 points)
       const fullData = await getFlightData(flight.id);
-
-      setExportProgress({ done: 1, total: 1, currentFile: 'Building file...' });
 
       let content = '';
       switch (format) {
@@ -163,16 +157,11 @@ export function FlightStats({ data }: FlightStatsProps) {
         const saved = await saveTextWithDialog(filename, content, [
           { name: format.toUpperCase(), extensions: [extension] },
         ]);
-        if (!saved) {
-          setIsExporting(false);
-          return;
-        }
+        if (!saved) return;
       }
-
-      setExportProgress({ done: 1, total: 1, currentFile: '' });
-      setTimeout(() => setIsExporting(false), 1000);
     } catch (error) {
       console.error('Export failed:', error);
+    } finally {
       setIsExporting(false);
     }
   };
@@ -193,8 +182,6 @@ export function FlightStats({ data }: FlightStatsProps) {
       const now = new Date();
       const pad2 = (n: number) => String(n).padStart(2, '0');
       const defaultFileName = `${baseName || 'flight'}_Report_${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}_${pad2(now.getHours())}-${pad2(now.getMinutes())}-${pad2(now.getSeconds())}.html`;
-
-      setExportProgress({ done: 0, total: 1, currentFile: `Processing ${baseName}` });
 
       // Fetch full-resolution data for the report
       const fullData: FlightDataResponse = await getFlightData(flight.id, 999999999);
@@ -228,8 +215,6 @@ export function FlightStats({ data }: FlightStatsProps) {
         getDisplaySerial,
       }];
 
-      setExportProgress({ done: 1, total: 1, currentFile: 'Building report...' });
-
       const htmlContent = buildHtmlReport(reportData, {
         documentTitle: config.documentTitle,
         pilotName: config.pilotName,
@@ -245,19 +230,13 @@ export function FlightStats({ data }: FlightStatsProps) {
       if (isWebMode()) {
         downloadFile(defaultFileName, htmlContent, 'text/html');
       } else {
-        const saved = await saveTextWithDialog(defaultFileName, htmlContent, [
+        await saveTextWithDialog(defaultFileName, htmlContent, [
           { name: 'HTML', extensions: ['html'] },
         ]);
-        if (!saved) {
-          setIsExporting(false);
-          return;
-        }
       }
-
-      setExportProgress({ done: 1, total: 1, currentFile: '' });
-      setTimeout(() => setIsExporting(false), 1000);
     } catch (error) {
       console.error('HTML report export failed:', error);
+    } finally {
       setIsExporting(false);
     }
   };
@@ -536,33 +515,6 @@ export function FlightStats({ data }: FlightStatsProps) {
         onGenerate={handleHtmlReportExport}
         flightCount={1}
       />
-
-      {/* Export Progress Overlay */}
-      {isExporting && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-drone-surface border border-gray-700 rounded-xl p-6 min-w-[320px] shadow-2xl text-left">
-            <h3 className="text-lg font-semibold mb-4 text-white">{t('flightList.exportingFlights')}</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm text-gray-400">
-                <span>{t('flightList.progress')}</span>
-                <span>{exportProgress.done} / {exportProgress.total}</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-full bg-drone-primary transition-all duration-300"
-                  style={{ width: `${exportProgress.total > 0 ? (exportProgress.done / exportProgress.total) * 100 : 0}%` }}
-                />
-              </div>
-              {exportProgress.currentFile && (
-                <div className="text-xs text-gray-500 truncate">
-                  {t('flightList.current')} {exportProgress.currentFile}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }
